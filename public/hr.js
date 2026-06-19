@@ -836,11 +836,10 @@ function quickAddToCRM() {
   renderCandidates();
   syncToSheets();
 
-  // Открываем CRM
-  const crmUrl = (state.crmUrl || 'https://yulanna-cloud.github.io/crm/').replace(/\/$/, '');
+  // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  const params = new URLSearchParams({ action: 'add', name, phone, vacancy: v ? v.title : '', source: 'HeadHunter' });
-  window.open(crmUrl + '/?' + params.toString(), 'crm_window');
+  CRM.addCandidateFromHR({ name, phone, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  switchView('crm');
   toast('Кандидат сохранён, открываю CRM...');
 }
 
@@ -849,7 +848,6 @@ function addToCRM(candidateId) {
   const c = state.candidates.find(x => x.id === candidateId);
   if (!c) return;
 
-  const crmUrl = (state.crmUrl || 'https://yulanna-cloud.github.io/crm/').replace(/\/$/, '');
   const v = state.vacancies.find(x => x.id === c.vacancyId);
 
   // Извлекаем телефон из текста резюме
@@ -859,18 +857,11 @@ function addToCRM(candidateId) {
     if (m) phone = '+7' + m[1] + m[2] + m[3] + m[4];
   }
 
-  const params = new URLSearchParams({
-    action: 'add',
-    name: c.name,
-    phone: phone,
-    vacancy: v ? v.title : '',
-    source: 'HeadHunter'
-  });
-
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  window.open(crmUrl + '/?' + params.toString(), 'crm_window');
+  CRM.addCandidateFromHR({ name: c.name, phone, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  switchView('crm');
   toast('Открываю CRM...');
 }
 

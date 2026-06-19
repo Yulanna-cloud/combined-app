@@ -838,38 +838,33 @@ function importJSON(e){
 loadLocal();updateFVSelect();render();loadFromSheets();
 
 // ========== ИНТЕГРАЦИЯ С HR-АССИСТЕНТОМ ==========
-(function checkURLParams() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('action') !== 'add') return;
-
-  const nameFromHR = decodeURIComponent(params.get('name') || '');
-  const phoneFromHR = decodeURIComponent(params.get('phone') || '');
-  const vacancyFromHR = decodeURIComponent(params.get('vacancy') || '');
-  const sourceFromHR = decodeURIComponent(params.get('source') || 'HR-ассистент');
-
+// Открывает модалку добавления кандидата, заполненную данными из HR-ассистента.
+// Вызывается напрямую при передаче кандидата внутри объединённого приложения,
+// либо через checkURLParams() ниже — это fallback для случая, когда CRM
+// открыта отдельной страницей по ссылке вида /?action=add&name=...
+function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vacancyFromHR, source: sourceFromHR }) {
   if (!nameFromHR) return;
 
-  setTimeout(function() {
-    const id = nextId();
-    pendingPdfName = '';
+  const id = nextId();
+  pendingPdfName = '';
 
-    let matchedVacancy = VACANCIES[0] || '';
-    if (vacancyFromHR) {
-      const exact = VACANCIES.find(v => v.toLowerCase() === vacancyFromHR.toLowerCase());
-      const partial = VACANCIES.find(v =>
-        v.toLowerCase().includes(vacancyFromHR.toLowerCase()) ||
-        vacancyFromHR.toLowerCase().includes(v.toLowerCase())
-      );
-      matchedVacancy = exact || partial || VACANCIES[0] || '';
-    }
+  let matchedVacancy = VACANCIES[0] || '';
+  if (vacancyFromHR) {
+    const exact = VACANCIES.find(v => v.toLowerCase() === vacancyFromHR.toLowerCase());
+    const partial = VACANCIES.find(v =>
+      v.toLowerCase().includes(vacancyFromHR.toLowerCase()) ||
+      vacancyFromHR.toLowerCase().includes(v.toLowerCase())
+    );
+    matchedVacancy = exact || partial || VACANCIES[0] || '';
+  }
 
-    const nameEsc = nameFromHR.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const phoneEsc = phoneFromHR.replace(/"/g, '&quot;');
-    const sourceEsc = sourceFromHR.replace(/"/g, '&quot;');
+  const nameEsc = nameFromHR.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const phoneEsc = (phoneFromHR || '').replace(/"/g, '&quot;');
+  const sourceEsc = (sourceFromHR || 'HR-ассистент').replace(/"/g, '&quot;');
 
-    document.getElementById('mdl').style.display = 'flex';
-    document.getElementById('mdl').className = 'modal-bg';
-    document.getElementById('mdl').innerHTML = `<div class="modal">
+  document.getElementById('mdl').style.display = 'flex';
+  document.getElementById('mdl').className = 'modal-bg';
+  document.getElementById('mdl').innerHTML = `<div class="modal">
 <h2>➕ Новый кандидат из HR-ассистента</h2>
 <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#2e7d32;display:flex;align-items:center;gap:8px;">
   ✅ Данные подгружены из HR-ассистента. Проверь и нажми «Добавить».
@@ -890,6 +885,22 @@ loadLocal();updateFVSelect();render();loadFromSheets();
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>
 </div>`;
+}
+
+// Fallback: если CRM открыта отдельно по ссылке с ?action=add&name=...
+(function checkURLParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') !== 'add') return;
+
+  const nameFromHR = decodeURIComponent(params.get('name') || '');
+  const phoneFromHR = decodeURIComponent(params.get('phone') || '');
+  const vacancyFromHR = decodeURIComponent(params.get('vacancy') || '');
+  const sourceFromHR = decodeURIComponent(params.get('source') || 'HR-ассистент');
+
+  if (!nameFromHR) return;
+
+  setTimeout(function() {
+    addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vacancyFromHR, source: sourceFromHR });
 
     const cleanUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
@@ -897,6 +908,7 @@ loadLocal();updateFVSelect();render();loadFromSheets();
 })();
 
 return {
+  addCandidateFromHR,
   addManager,
   addSlot,
   addVacancy,
