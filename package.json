@@ -1,0 +1,12 @@
+{
+  "name": "eps-hub",
+  "version": "1.0.0",
+  "description": "Combined HR-assistant + CRM app for EPS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
