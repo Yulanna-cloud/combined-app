@@ -1,0 +1,27 @@
+html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+
+.shell-tabs {
+  display: flex;
+  gap: 4px;
+  background: #0d1f35;
+  padding: 6px 10px 0;
+}
+.shell-tab {
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.65);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+.shell-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.shell-tab.active { background: #eef2f7; color: #1F3864; }
+
+.view { display: none; height: calc(100vh - 38px); overflow: hidden; }
+.view.active { display: block; }
