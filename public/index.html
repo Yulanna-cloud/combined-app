@@ -29,28 +29,28 @@
     </div>
     <div class="vacancy-selector">
       <div class="vacancy-select-wrap">
-        <select id="vacancy-select" onchange="onVacancyChange()">
+        <select id="vacancy-select" onchange="HR.onVacancyChange()">
           <option value="">— Выбери вакансию —</option>
         </select>
       </div>
       <div class="vacancy-actions">
-        <button class="vac-btn" onclick="showPanel('vacancy')"><i class="ti ti-edit"></i> Изменить</button>
-        <button class="vac-btn" onclick="newVacancy()"><i class="ti ti-plus"></i> Новая</button>
-        <button class="vac-btn danger" onclick="deleteVacancy()"><i class="ti ti-trash"></i></button>
+        <button class="vac-btn" onclick="HR.showPanel('vacancy')"><i class="ti ti-edit"></i> Изменить</button>
+        <button class="vac-btn" onclick="HR.newVacancy()"><i class="ti ti-plus"></i> Новая</button>
+        <button class="vac-btn danger" onclick="HR.deleteVacancy()"><i class="ti ti-trash"></i></button>
       </div>
     </div>
     <div class="nav-section">
       <div class="nav-label">Меню</div>
-      <button class="nav-btn" id="nav-new" onclick="showPanel('new')">
+      <button class="nav-btn" id="nav-new" onclick="HR.showPanel('new')">
         <i class="ti ti-user-plus"></i> Новый кандидат
       </button>
-      <button class="nav-btn" id="nav-rating" onclick="showPanel('rating')">
+      <button class="nav-btn" id="nav-rating" onclick="HR.showPanel('rating')">
         <i class="ti ti-trophy"></i> Рейтинг
       </button>
-      <button class="nav-btn" id="nav-prompt" onclick="showPanel('prompt')">
+      <button class="nav-btn" id="nav-prompt" onclick="HR.showPanel('prompt')">
         <i class="ti ti-brain"></i> Промт анализа
       </button>
-      <button class="nav-btn" id="nav-settings" onclick="showPanel('settings')">
+      <button class="nav-btn" id="nav-settings" onclick="HR.showPanel('settings')">
         <i class="ti ti-settings"></i> Настройки
       </button>
     </div>
@@ -59,10 +59,10 @@
       <div id="candidates-list"></div>
     </div>
     <div class="sidebar-footer">
-      <button class="add-cand-btn" onclick="showPanel('new')">
+      <button class="add-cand-btn" onclick="HR.showPanel('new')">
         <i class="ti ti-plus"></i> Добавить кандидата
       </button>
-      <button class="add-cand-btn" onclick="toggleArchiveView()" id="archive-toggle-btn" style="background:transparent;color:var(--text3);border:1px solid var(--border-med);font-size:11px;margin-top:4px;">
+      <button class="add-cand-btn" onclick="HR.toggleArchiveView()" id="archive-toggle-btn" style="background:transparent;color:var(--text3);border:1px solid var(--border-med);font-size:11px;margin-top:4px;">
         <i class="ti ti-archive"></i> <span id="archive-toggle-label">Архив отказов</span>
       </button>
     </div>
@@ -73,8 +73,8 @@
       <h2 id="main-title">Выбери вакансию</h2>
       <div style="display:flex;align-items:center;gap:8px;">
         <span id="sync-status" style="display:none;font-size:11px;padding:3px 10px;border-radius:5px;font-weight:600;"></span>
-        <button class="btn" onclick="loadFromSheets()" title="Загрузить данные из Google Sheets"><i class="ti ti-refresh"></i> Загрузить</button>
-        <button class="btn" onclick="syncToSheets()" title="Сохранить данные в Google Sheets"><i class="ti ti-cloud-upload"></i> Сохранить</button>
+        <button class="btn" onclick="HR.loadFromSheets()" title="Загрузить данные из Google Sheets"><i class="ti ti-refresh"></i> Загрузить</button>
+        <button class="btn" onclick="HR.syncToSheets()" title="Сохранить данные в Google Sheets"><i class="ti ti-cloud-upload"></i> Сохранить</button>
         <div id="header-btns" style="display:flex;align-items:center;gap:8px;"></div>
       </div>
     </div>
@@ -90,7 +90,7 @@
         <div class="field"><label>Описание вакансии (требования, задачи, условия)</label><textarea id="v-desc" rows="7" placeholder="Вставь полный текст вакансии..."></textarea></div>
         <div class="field"><label>О компании</label><textarea id="v-company" rows="3" placeholder="ЭнергоПромСервис — инжиниринговая компания, Казань..."></textarea></div>
         <div class="field"><label>Твои комментарии</label><textarea id="v-notes" rows="4" placeholder="Например: важна самостоятельная работа в Гранд-Смете, опыт по ЭОМ обязателен..."></textarea></div>
-        <button class="btn btn-primary btn-full" onclick="saveVacancy()"><i class="ti ti-check"></i> Сохранить вакансию</button>
+        <button class="btn btn-primary btn-full" onclick="HR.saveVacancy()"><i class="ti ti-check"></i> Сохранить вакансию</button>
       </div>
 
       <!-- Prompt -->
@@ -101,20 +101,20 @@
         </div>
         <div class="field"><label>Промт для анализа резюме</label><textarea id="prompt-resume" rows="14"></textarea></div>
         <div style="display:flex;gap:8px;margin-bottom:20px;">
-          <button class="btn btn-primary" onclick="savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
-          <button class="btn" onclick="resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
+          <button class="btn btn-primary" onclick="HR.savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
+          <button class="btn" onclick="HR.resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
         </div>
         <hr class="divider">
         <div class="field"><label>Промт для вопросов к интервью</label><textarea id="prompt-questions" rows="12"></textarea></div>
         <div style="display:flex;gap:8px;margin-bottom:20px;">
-          <button class="btn btn-primary" onclick="savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
-          <button class="btn" onclick="resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
+          <button class="btn btn-primary" onclick="HR.savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
+          <button class="btn" onclick="HR.resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
         </div>
         <hr class="divider">
         <div class="field"><label>Промт для разбора интервью</label><textarea id="prompt-interview" rows="12"></textarea></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" onclick="savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
-          <button class="btn" onclick="resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
+          <button class="btn btn-primary" onclick="HR.savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
+          <button class="btn" onclick="HR.resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
         </div>
       </div>
 
@@ -124,8 +124,8 @@
           <i class="ti ti-alert-triangle"></i>
           <span>Сначала выбери или создай вакансию — без неё анализ будет без контекста</span>
         </div>
-        <div class="pdf-upload-area" id="pdf-area" onclick="document.getElementById('pdf-input').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)" style="padding:10px 16px;display:flex;align-items:center;gap:12px;text-align:left;">
-          <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="onFileSelected(event)">
+        <div class="pdf-upload-area" id="pdf-area" onclick="document.getElementById('pdf-input').click()" ondragover="HR.onDragOver(event)" ondragleave="HR.onDragLeave(event)" ondrop="HR.onDrop(event)" style="padding:10px 16px;display:flex;align-items:center;gap:12px;text-align:left;">
+          <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="HR.onFileSelected(event)">
           <span style="font-size:22px;">📄</span>
           <div>
             <p style="font-size:13px;font-weight:600;">Загрузи резюме с HH</p>
@@ -139,13 +139,13 @@
           <p class="field-hint">Из PDF извлекается автоматически. Можно отредактировать.</p>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <button class="btn btn-full" onclick="showCompareFromNew()" style="flex:1;" title="Сравнить кандидата по двум вакансиям">
+          <button class="btn btn-full" onclick="HR.showCompareFromNew()" style="flex:1;" title="Сравнить кандидата по двум вакансиям">
             <i class="ti ti-scale"></i> Сравнить
           </button>
-          <button class="btn btn-primary btn-full" onclick="analyzeResume()" style="flex:2">
+          <button class="btn btn-primary btn-full" onclick="HR.analyzeResume()" style="flex:2">
             <i class="ti ti-sparkles"></i> Проанализировать резюме
           </button>
-          <button class="btn btn-full" onclick="quickAddToCRM()" style="flex:1;background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;" title="Добавить в CRM без анализа">
+          <button class="btn btn-full" onclick="HR.quickAddToCRM()" style="flex:1;background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;" title="Добавить в CRM без анализа">
             <i class="ti ti-database-plus"></i> В CRM
           </button>
         </div>
@@ -163,11 +163,11 @@
             <label>Вакансия</label>
             <select id="rating-vacancy-select"></select>
           </div>
-          <button class="btn" onclick="selectAllForRating()">✓ Все</button>
-          <button class="btn" onclick="clearRatingSelection()">✕ Сбросить</button>
+          <button class="btn" onclick="HR.selectAllForRating()">✓ Все</button>
+          <button class="btn" onclick="HR.clearRatingSelection()">✕ Сбросить</button>
         </div>
         <div id="rating-candidates-list" style="margin-bottom:16px;max-height:280px;overflow-y:auto;border:1px solid var(--border-med);border-radius:var(--radius);"></div>
-        <button class="btn btn-primary btn-full" onclick="buildRating()" id="rating-btn">
+        <button class="btn btn-primary btn-full" onclick="HR.buildRating()" id="rating-btn">
           <i class="ti ti-trophy"></i> Построить рейтинг
         </button>
         <div id="rating-result" style="margin-top:16px;"></div>
@@ -176,16 +176,16 @@
       <!-- Candidate detail -->
       <div class="panel" id="panel-candidate">
         <div class="tabs">
-          <button class="tab-btn active" id="tab-btn-resume" onclick="switchTab('resume')">Анализ резюме</button>
-          <button class="tab-btn" id="tab-btn-questions" onclick="switchTab('questions')">Вопросы для интервью</button>
-          <button class="tab-btn" id="tab-btn-interview" onclick="switchTab('interview')">Разбор интервью</button>
-          <button class="tab-btn" id="tab-btn-rawresume" onclick="switchTab('rawresume')">Резюме</button>
-          <button class="tab-btn" id="tab-btn-compare" onclick="switchTab('compare')">⚖️ Сравнить</button>
+          <button class="tab-btn active" id="tab-btn-resume" onclick="HR.switchTab('resume')">Анализ резюме</button>
+          <button class="tab-btn" id="tab-btn-questions" onclick="HR.switchTab('questions')">Вопросы для интервью</button>
+          <button class="tab-btn" id="tab-btn-interview" onclick="HR.switchTab('interview')">Разбор интервью</button>
+          <button class="tab-btn" id="tab-btn-rawresume" onclick="HR.switchTab('rawresume')">Резюме</button>
+          <button class="tab-btn" id="tab-btn-compare" onclick="HR.switchTab('compare')">⚖️ Сравнить</button>
         </div>
         <div id="tab-resume"><div id="resume-content"></div></div>
         <div id="tab-questions" style="display:none;">
           <div class="field"><label>Особый фокус для этого кандидата</label><textarea id="q-focus" rows="3" placeholder="Что особенно важно проверить?"></textarea></div>
-          <button class="btn btn-primary btn-full" onclick="generateQuestions()"><i class="ti ti-list"></i> Сгенерировать вопросы для интервью</button>
+          <button class="btn btn-primary btn-full" onclick="HR.generateQuestions()"><i class="ti ti-list"></i> Сгенерировать вопросы для интервью</button>
           <div id="questions-content"></div>
         </div>
         <div id="tab-compare" style="display:none;">
@@ -201,7 +201,7 @@
                 <label>Вакансия 2</label>
                 <select id="compare-vac2"></select>
               </div>
-              <button class="btn btn-primary" onclick="runComparison()" style="white-space:nowrap;padding:8px 20px;">
+              <button class="btn btn-primary" onclick="HR.runComparison()" style="white-space:nowrap;padding:8px 20px;">
                 <i class="ti ti-sparkles"></i> Сравнить
               </button>
             </div>
@@ -211,13 +211,13 @@
         <div id="tab-rawresume" style="display:none;">
           <div class="ai-result-label" style="margin-bottom:8px;"><i class="ti ti-file-text"></i> Текст резюме</div>
           <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-            <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="copyText(currentCandidate()?.resume)"><i class="ti ti-copy"></i> Скопировать резюме</button>
+            <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.copyText(HR.currentCandidate()?.resume)"><i class="ti ti-copy"></i> Скопировать резюме</button>
           </div>
           <div id="rawresume-content" style="background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);height:calc(100vh - 260px);overflow-y:auto;"></div>
         </div>
         <div id="tab-interview" style="display:none;">
           <div class="field"><label>Транскрипт или заметки интервью</label><textarea id="i-transcript" style="height:calc(100vh - 380px);min-height:200px;resize:none;" placeholder="Вставь запись интервью..."></textarea></div>
-          <button class="btn btn-primary btn-full" onclick="analyzeInterview()"><i class="ti ti-brain"></i> Разобрать интервью</button>
+          <button class="btn btn-primary btn-full" onclick="HR.analyzeInterview()"><i class="ti ti-brain"></i> Разобрать интервью</button>
           <div id="interview-content"></div>
         </div>
       </div>
@@ -244,7 +244,7 @@
           <input type="text" id="crm-url" placeholder="https://yulanna-cloud.github.io/crm/">
           <p class="field-hint">Будет использоваться для кнопки «Добавить в CRM»</p>
         </div>
-        <button class="btn btn-primary" onclick="saveSettings()"><i class="ti ti-check"></i> Сохранить</button>
+        <button class="btn btn-primary" onclick="HR.saveSettings()"><i class="ti ti-check"></i> Сохранить</button>
         <hr class="divider">
         <div class="section-title">Как получить API ключ</div>
         <div class="info-box info-blue" style="flex-direction:column;gap:6px;">
@@ -258,7 +258,7 @@
         </div>
         <hr class="divider">
         <div class="section-title" style="color:var(--red-text);">Опасная зона</div>
-        <button class="btn btn-danger" onclick="clearAllData()"><i class="ti ti-trash"></i> Удалить все данные</button>
+        <button class="btn btn-danger" onclick="HR.clearAllData()"><i class="ti ti-trash"></i> Удалить все данные</button>
       </div>
 
     </div>
@@ -271,8 +271,8 @@
     <h3>Новая вакансия</h3>
     <div class="field"><label>Название вакансии</label><input type="text" id="modal-vac-name" placeholder="Например: РОП, Главный энергетик..."></div>
     <div class="modal-footer">
-      <button class="btn" onclick="closeModal()">Отмена</button>
-      <button class="btn btn-primary" onclick="createVacancy()"><i class="ti ti-plus"></i> Создать</button>
+      <button class="btn" onclick="HR.closeModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="HR.createVacancy()"><i class="ti ti-plus"></i> Создать</button>
     </div>
   </div>
 </div>
@@ -289,65 +289,65 @@
   <div class="filters">
     <input type="text" id="srch" placeholder="🔍 Поиск..." style="width:140px">
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:0 10px;height:32px;border:1px solid #1976d2;border-radius:6px;background:#e3f2fd;color:#1565c0;font-weight:600;white-space:nowrap">
-      <input type="checkbox" id="activeOnly" checked onchange="renderTable()" style="width:14px;height:14px;accent-color:#1565c0"> Только активные
+      <input type="checkbox" id="activeOnly" checked onchange="CRM.renderTable()" style="width:14px;height:14px;accent-color:#1565c0"> Только активные
     </label>
-    <input type="date" id="fDate" onchange="renderTable()" style="height:32px;font-size:13px;border:1px solid #ccc;border-radius:6px;padding:0 8px;background:#fff">
-    <button class="btn" onclick="setToday()" style="background:#fff8e1;border-color:#f9a825;color:#f57f17;font-weight:600;white-space:nowrap">📅 Сегодня</button>
-    <button class="btn" onclick="clearDate()" style="font-size:12px">✕ Дата</button>
+    <input type="date" id="fDate" onchange="CRM.renderTable()" style="height:32px;font-size:13px;border:1px solid #ccc;border-radius:6px;padding:0 8px;background:#fff">
+    <button class="btn" onclick="CRM.setToday()" style="background:#fff8e1;border-color:#f9a825;color:#f57f17;font-weight:600;white-space:nowrap">📅 Сегодня</button>
+    <button class="btn" onclick="CRM.clearDate()" style="font-size:12px">✕ Дата</button>
     <select id="fV"><option value="">Все вакансии</option></select>
     <div class="dd-wrap">
-      <button class="btn" onclick="toggleDD('stageDD')" id="stageBtnLabel" style="min-width:120px;text-align:left">Все этапы ▾</button>
+      <button class="btn" onclick="CRM.toggleDD('stageDD')" id="stageBtnLabel" style="min-width:120px;text-align:left">Все этапы ▾</button>
       <div id="stageDD" class="dd-menu">
-        <label><input type="checkbox" value="Отклик" onchange="applyStageFilter()"> Отклик</label>
-        <label><input type="checkbox" value="Интервью HR — назначено" onchange="applyStageFilter()"> Интервью HR — назначено</label>
-        <label><input type="checkbox" value="Интервью HR — проведено" onchange="applyStageFilter()"> Интервью HR — проведено</label>
-        <label><input type="checkbox" value="Интервью с РОП — назначено" onchange="applyStageFilter()"> Интервью с РОП — назначено</label>
-        <label><input type="checkbox" value="Интервью с РОП — проведено" onchange="applyStageFilter()"> Интервью с РОП — проведено</label>
-        <label><input type="checkbox" value="Оффер" onchange="applyStageFilter()"> Оффер</label>
-        <label><input type="checkbox" value="Обучение" onchange="applyStageFilter()"> Обучение</label>
-        <label><input type="checkbox" value="Работает" onchange="applyStageFilter()"> Работает</label>
-        <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="clearStageFilter()">Сбросить</button></div>
+        <label><input type="checkbox" value="Отклик" onchange="CRM.applyStageFilter()"> Отклик</label>
+        <label><input type="checkbox" value="Интервью HR — назначено" onchange="CRM.applyStageFilter()"> Интервью HR — назначено</label>
+        <label><input type="checkbox" value="Интервью HR — проведено" onchange="CRM.applyStageFilter()"> Интервью HR — проведено</label>
+        <label><input type="checkbox" value="Интервью с РОП — назначено" onchange="CRM.applyStageFilter()"> Интервью с РОП — назначено</label>
+        <label><input type="checkbox" value="Интервью с РОП — проведено" onchange="CRM.applyStageFilter()"> Интервью с РОП — проведено</label>
+        <label><input type="checkbox" value="Оффер" onchange="CRM.applyStageFilter()"> Оффер</label>
+        <label><input type="checkbox" value="Обучение" onchange="CRM.applyStageFilter()"> Обучение</label>
+        <label><input type="checkbox" value="Работает" onchange="CRM.applyStageFilter()"> Работает</label>
+        <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStageFilter()">Сбросить</button></div>
       </div>
     </div>
     <div class="dd-wrap">
-      <button class="btn" onclick="toggleDD('statusDD')" id="statusBtnLabel" style="min-width:120px;text-align:left">Все статусы ▾</button>
+      <button class="btn" onclick="CRM.toggleDD('statusDD')" id="statusBtnLabel" style="min-width:120px;text-align:left">Все статусы ▾</button>
       <div id="statusDD" class="dd-menu">
-        <label><input type="checkbox" value="В работе" onchange="applyStatusFilter()"> В работе</label>
-        <label><input type="checkbox" value="Перенос собеседования" onchange="applyStatusFilter()"> Перенос собеседования</label>
-        <label><input type="checkbox" value="Недозвон" onchange="applyStatusFilter()"> Недозвон</label>
-        <label><input type="checkbox" value="Перезвон" onchange="applyStatusFilter()"> Перезвон</label>
-        <label><input type="checkbox" value="Отказался сам (кандидат)" onchange="applyStatusFilter()"> Отказался сам (кандидат)</label>
-        <label><input type="checkbox" value="Отказ" onchange="applyStatusFilter()"> Отказ</label>
-        <label><input type="checkbox" value="Оффер" onchange="applyStatusFilter()"> Оффер</label>
-        <label><input type="checkbox" value="Вышел" onchange="applyStatusFilter()"> Вышел</label>
-        <label><input type="checkbox" value="Не вышел на собеседование" onchange="applyStatusFilter()"> Не вышел на собеседование</label>
-        <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="clearStatusFilter()">Сбросить</button></div>
+        <label><input type="checkbox" value="В работе" onchange="CRM.applyStatusFilter()"> В работе</label>
+        <label><input type="checkbox" value="Перенос собеседования" onchange="CRM.applyStatusFilter()"> Перенос собеседования</label>
+        <label><input type="checkbox" value="Недозвон" onchange="CRM.applyStatusFilter()"> Недозвон</label>
+        <label><input type="checkbox" value="Перезвон" onchange="CRM.applyStatusFilter()"> Перезвон</label>
+        <label><input type="checkbox" value="Отказался сам (кандидат)" onchange="CRM.applyStatusFilter()"> Отказался сам (кандидат)</label>
+        <label><input type="checkbox" value="Отказ" onchange="CRM.applyStatusFilter()"> Отказ</label>
+        <label><input type="checkbox" value="Оффер" onchange="CRM.applyStatusFilter()"> Оффер</label>
+        <label><input type="checkbox" value="Вышел" onchange="CRM.applyStatusFilter()"> Вышел</label>
+        <label><input type="checkbox" value="Не вышел на собеседование" onchange="CRM.applyStatusFilter()"> Не вышел на собеседование</label>
+        <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStatusFilter()">Сбросить</button></div>
       </div>
     </div>
-    <button class="btn btn-report" onclick="openReport()">📊 Отчёт</button>
+    <button class="btn btn-report" onclick="CRM.openReport()">📊 Отчёт</button>
     <div class="dd-wrap" style="position:relative">
-      <button class="btn btn-settings" onclick="toggleSettingsMenu()">⚙️ Настройки ▾</button>
+      <button class="btn btn-settings" onclick="CRM.toggleSettingsMenu()">⚙️ Настройки ▾</button>
       <div class="settings-menu" id="settingsMenu">
-        <div class="settings-menu-item" onclick="openVacancySettings();closeSettingsMenu()">🏢 Управление вакансиями</div>
-        <div class="settings-menu-item" onclick="openManagersSettings();closeSettingsMenu()">👤 Руководители</div>
-        <div class="settings-menu-item" onclick="openSlotsManager();closeSettingsMenu()">📅 Мои слоты</div>
-        <div class="settings-menu-item" onclick="openCloseVacancy();closeSettingsMenu()">🔒 Закрыть вакансию</div>
-        <div class="settings-menu-item" onclick="archiveAllInactive();closeSettingsMenu()">🗄 Архивировать неактивных</div>
-        <div class="settings-menu-item" onclick="openBulkDelete();closeSettingsMenu()">🗑 Удалить по вакансии</div>
+        <div class="settings-menu-item" onclick="CRM.openVacancySettings();CRM.closeSettingsMenu()">🏢 Управление вакансиями</div>
+        <div class="settings-menu-item" onclick="CRM.openManagersSettings();CRM.closeSettingsMenu()">👤 Руководители</div>
+        <div class="settings-menu-item" onclick="CRM.openSlotsManager();CRM.closeSettingsMenu()">📅 Мои слоты</div>
+        <div class="settings-menu-item" onclick="CRM.openCloseVacancy();CRM.closeSettingsMenu()">🔒 Закрыть вакансию</div>
+        <div class="settings-menu-item" onclick="CRM.archiveAllInactive();CRM.closeSettingsMenu()">🗄 Архивировать неактивных</div>
+        <div class="settings-menu-item" onclick="CRM.openBulkDelete();CRM.closeSettingsMenu()">🗑 Удалить по вакансии</div>
       </div>
     </div>
-    <button class="btn btn-sync" onclick="syncToSheets()">☁️ Сохранить</button>
-    <button class="btn btn-load" onclick="loadFromSheets()">🔄 Загрузить</button>
-    <label class="btn" style="cursor:pointer;background:#fff3e0;border-color:#ff9800;color:#e65100;font-weight:600">📂 Импорт<input type="file" accept=".json" onchange="importJSON(event)" style="display:none"></label>
-    <button class="btn btn-primary" onclick="openAdd()">+ Добавить</button>
+    <button class="btn btn-sync" onclick="CRM.syncToSheets()">☁️ Сохранить</button>
+    <button class="btn btn-load" onclick="CRM.loadFromSheets()">🔄 Загрузить</button>
+    <label class="btn" style="cursor:pointer;background:#fff3e0;border-color:#ff9800;color:#e65100;font-weight:600">📂 Импорт<input type="file" accept=".json" onchange="CRM.importJSON(event)" style="display:none"></label>
+    <button class="btn btn-primary" onclick="CRM.openAdd()">+ Добавить</button>
     <span id="syncStatus" class="sync-status" style="display:none"></span>
   </div>
 </div>
 <div class="stats" id="stats"></div>
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('c',this)">Кандидаты</div>
-  <div class="tab" onclick="switchTab('h',this)">История событий</div>
-  <div class="tab" onclick="switchTab('a',this)">🗄 Архив</div>
+  <div class="tab active" onclick="CRM.switchTab('c',this)">Кандидаты</div>
+  <div class="tab" onclick="CRM.switchTab('h',this)">История событий</div>
+  <div class="tab" onclick="CRM.switchTab('a',this)">🗄 Архив</div>
 </div>
 <div id="tc"><div class="tbl-wrap"><table><thead><tr id="thead-row"></tr></thead><tbody id="tb"></tbody></table></div></div>
 <div id="th" style="display:none"><div class="tbl-wrap"><div id="hb"></div></div></div>

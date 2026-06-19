@@ -1,3 +1,4 @@
+const CRM = (function() {
 const SHEETS_URL='https://script.google.com/macros/s/AKfycbz4bRHeOTKV9Be1sSiF2EYa1Q_n8h6kqIdGRLMYkYZwJ3-z6kraaB0L6rCvwPWaqD7S/exec';
 function toggleSettingsMenu(){
   const m=document.getElementById('settingsMenu');
@@ -57,23 +58,23 @@ function openVacancySettings(){
 <label>Добавить новую вакансию</label>
 <div style="display:flex;gap:8px">
 <input id="newVacName" placeholder="Название вакансии" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-<button class="btn btn-primary" onclick="addVacancy()">Добавить</button>
+<button class="btn btn-primary" onclick="CRM.addVacancy()">Добавить</button>
 </div>
 </div>
-<div class="mfoot"><button class="btn" onclick="closeModal()">Закрыть</button></div>`);
+<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>`);
   renderVacList();
 }
 function renderVacList(){
   const el=document.getElementById('vacList');if(!el)return;
   el.innerHTML=VACANCIES.map((v,i)=>{
     const s=getVacStyle(v);
-    const colorDots=COLOR_PRESETS.map(p=>`<span class="color-swatch" style="background:${p.bg};border-color:${p.fg}${s&&s.bg===p.bg?';outline:2px solid #333':''}" title="${p.name}" onclick="setVacColor(${i},'${p.bg}|${p.fg}')"></span>`).join('');
-    const clearBtn=s?`<span class="color-swatch" style="background:#fff;border-color:#ccc" title="Без цвета" onclick="clearVacColor(${i})">✕</span>`:'';
+    const colorDots=COLOR_PRESETS.map(p=>`<span class="color-swatch" style="background:${p.bg};border-color:${p.fg}${s&&s.bg===p.bg?';outline:2px solid #333':''}" title="${p.name}" onclick="CRM.setVacColor(${i},'${p.bg}|${p.fg}')"></span>`).join('');
+    const clearBtn=s?`<span class="color-swatch" style="background:#fff;border-color:#ccc" title="Без цвета" onclick="CRM.clearVacColor(${i})">✕</span>`:'';
     return `<div style="padding:8px 0;border-bottom:1px solid #f0f0f0">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
 <input value="${v}" id="vac_${i}" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-<button class="btn btn-sm" onclick="saveVacancyName(${i})">💾</button>
-<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a" onclick="removeVacancy(${i})">🗑</button>
+<button class="btn btn-sm" onclick="CRM.saveVacancyName(${i})">💾</button>
+<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a" onclick="CRM.removeVacancy(${i})">🗑</button>
 </div>
 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:4px">
 <span style="font-size:11px;color:#888">Цвет:</span>
@@ -194,12 +195,12 @@ function renderStats(){
   document.getElementById('stats').innerHTML=`
 <div class="stat"><div class="stat-n">${active}</div><div class="stat-l">В работе</div></div>
 <div class="stat"><div class="stat-n">${offers}</div><div class="stat-l">На стадии оффера</div></div>
-<div class="stat" onclick="setToday()"><div class="stat-n">${tod}</div><div class="stat-l">Встреч сегодня 👆</div></div>
+<div class="stat" onclick="CRM.setToday()"><div class="stat-n">${tod}</div><div class="stat-l">Встреч сегодня 👆</div></div>
 <div class="stat"><div class="stat-n">${ref}</div><div class="stat-l">Отказов</div></div>`;
 }
 function renderHeaders(){
   const cols=[{key:'id',label:'ID',w:'60px'},{key:'name',label:'ФИО',w:'180px'},{key:'vacancy',label:'Вакансия',w:'170px'},{key:'stage',label:'Этап',w:'170px'},{key:'status',label:'Статус',w:'165px'},{key:'',label:'Следующий шаг',w:'160px'},{key:'date',label:'Дата',w:'90px'},{key:'',label:'Время',w:'70px'},{key:'',label:'Телефон',w:'130px'},{key:'',label:'Причина отказа',w:'120px'},{key:'',label:'Комментарий',w:'200px'},{key:'',label:'Резюме',w:'70px'},{key:'',label:'HH',w:'70px'},{key:'',label:'',w:'50px'}];
-  document.getElementById('thead-row').innerHTML=cols.map(c=>`<th${c.key?` onclick="sortBy('${c.key}')"`:''} style="width:${c.w};padding:10px 12px;background:#1F3864;color:#fff;font-weight:700;border-bottom:2px solid #162a4a;white-space:nowrap${c.key?';cursor:pointer':''}">${c.label}${c.key?arrow(c.key):''}</th>`).join('');
+  document.getElementById('thead-row').innerHTML=cols.map(c=>`<th${c.key?` onclick="CRM.sortBy('${c.key}')"`:''} style="width:${c.w};padding:10px 12px;background:#1F3864;color:#fff;font-weight:700;border-bottom:2px solid #162a4a;white-space:nowrap${c.key?';cursor:pointer':''}">${c.label}${c.key?arrow(c.key):''}</th>`).join('');
 }
 function renderTable(){
   const tb=document.getElementById('tb');renderHeaders();
@@ -231,7 +232,7 @@ function renderTable(){
     const resume=c.resumeLink?`<a href="${c.resumeLink}" target="_blank" style="color:#185FA5">Открыть</a>`:'—';
     const hh=c.hhLink?`<a href="${c.hhLink}" target="_blank" style="color:#d6001c">HH ↗</a>`:'—';
     const refReason=REFUSE_STATUSES.includes(c.status)&&c.refuseReason?`<span class="badge br">${c.refuseReason}</span>`:'';
-    return `<tr class="${rclass(c)}"><td>${c.id}</td><td><b>${c.name}</b></td><td>${vacBadge(c.vacancy)}</td><td>${c.stage}</td><td>${sbadge(c.status)}</td><td>${c.next||'—'}</td><td>${dlabel(c.nextDate)}</td><td>${c.meetTime||''}</td><td>${phone||'—'}</td><td>${refReason}</td><td style="max-width:200px;white-space:normal">${c.comment||''}</td><td>${resume}</td><td>${hh}</td><td><button class="btn btn-sm" onclick="openEdit('${c.id}')">✏️</button></td></tr>`;
+    return `<tr class="${rclass(c)}"><td>${c.id}</td><td><b>${c.name}</b></td><td>${vacBadge(c.vacancy)}</td><td>${c.stage}</td><td>${sbadge(c.status)}</td><td>${c.next||'—'}</td><td>${dlabel(c.nextDate)}</td><td>${c.meetTime||''}</td><td>${phone||'—'}</td><td>${refReason}</td><td style="max-width:200px;white-space:normal">${c.comment||''}</td><td>${resume}</td><td>${hh}</td><td><button class="btn btn-sm" onclick="CRM.openEdit('${c.id}')">✏️</button></td></tr>`;
   }).join('');
 }
 function renderHistory(){
@@ -245,7 +246,7 @@ function renderArchive(){
   const archived=D.candidates.filter(c=>c.archived);
   athead.innerHTML='<th style="background:#1F3864;color:#fff;padding:10px 12px">ID</th><th style="background:#1F3864;color:#fff;padding:10px 12px">ФИО</th><th style="background:#1F3864;color:#fff;padding:10px 12px">Вакансия</th><th style="background:#1F3864;color:#fff;padding:10px 12px">Этап</th><th style="background:#1F3864;color:#fff;padding:10px 12px">Статус</th><th style="background:#1F3864;color:#fff;padding:10px 12px">Причина</th><th style="background:#1F3864;color:#fff;padding:10px 12px">Добавлен</th><th style="background:#1F3864;color:#fff;padding:10px 12px"></th>';
   if(!archived.length){atb.innerHTML=`<tr><td colspan="8" class="empty">Архив пуст</td></tr>`;return;}
-  atb.innerHTML=archived.map(c=>`<tr class="row-done"><td>${c.id}</td><td><b>${c.name}</b></td><td>${c.vacancy}</td><td>${c.stage}</td><td>${sbadge(c.status)}</td><td>${c.refuseReason?`<span class="badge br">${c.refuseReason}</span>`:''}</td><td>${c.added||''}</td><td><button class="btn btn-sm" onclick="unarchiveCandidate('${c.id}')" title="Вернуть">↩️</button></td></tr>`).join('');
+  atb.innerHTML=archived.map(c=>`<tr class="row-done"><td>${c.id}</td><td><b>${c.name}</b></td><td>${c.vacancy}</td><td>${c.stage}</td><td>${sbadge(c.status)}</td><td>${c.refuseReason?`<span class="badge br">${c.refuseReason}</span>`:''}</td><td>${c.added||''}</td><td><button class="btn btn-sm" onclick="CRM.unarchiveCandidate('${c.id}')" title="Вернуть">↩️</button></td></tr>`).join('');
 }
 function render(){renderStats();renderTable();renderHistory();renderArchive();}
 function switchTab(t,el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById('tc').style.display=t==='c'?'block':'none';document.getElementById('th').style.display=t==='h'?'block':'none';document.getElementById('ta').style.display=t==='a'?'block':'none';}
@@ -280,7 +281,7 @@ function openManagersSettings(){
       '<input class="mgr-name" data-i="'+i+'" type="text" value="'+m.name+'" placeholder="ФИО руководителя" style="flex:2;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
       '<input class="mgr-phone" data-i="'+i+'" type="text" value="'+m.phone+'" placeholder="Телефон" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
       '<input class="mgr-company" data-i="'+i+'" type="text" value="'+m.company+'" placeholder="Компания" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
-      '<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;flex-shrink:0;" onclick="deleteManager('+i+')">✕</button>'+
+      '<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;flex-shrink:0;" onclick="CRM.deleteManager('+i+')">✕</button>'+
       '</div>';
   }).join(''):'<p style="color:#aaa;font-size:13px;margin-bottom:10px;">Нет руководителей.</p>';
 
@@ -291,9 +292,9 @@ function openManagersSettings(){
     '<input id="newMgrName" type="text" placeholder="ФИО руководителя" style="flex:2;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
     '<input id="newMgrPhone" type="text" placeholder="Телефон" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
     '<input id="newMgrCompany" type="text" placeholder="Компания" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
-    '<button class="btn btn-primary" onclick="addManager()" style="flex-shrink:0;">+ Добавить</button>'+
+    '<button class="btn btn-primary" onclick="CRM.addManager()" style="flex-shrink:0;">+ Добавить</button>'+
     '</div>'+
-    '<div class="mfoot"><button class="btn" onclick="saveManagerEdits();closeModal()">Сохранить и закрыть</button></div>');
+    '<div class="mfoot"><button class="btn" onclick="CRM.saveManagerEdits();CRM.closeModal()">Сохранить и закрыть</button></div>');
 }
 
 function addManager(){
@@ -374,19 +375,19 @@ function openSlotsManager(){
   var past=slots.filter(function(s){return s.dateRaw<today;});
   var rows=future.length?future.map(function(s,i){
     var realIdx=slots.indexOf(s);
-    return '<div class="slot-item '+(s.taken?'taken':'free')+'"><div><span class="slot-time">'+s.time+'</span> <span style="color:#555;margin-left:8px;">'+s.date+'</span>'+(s.taken?' <span style="font-size:11px;color:#a02020;margin-left:6px;">занят: '+s.takenBy+'</span>':'')+'</div><button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;" onclick="deleteSlot('+realIdx+')">✕</button></div>';
+    return '<div class="slot-item '+(s.taken?'taken':'free')+'"><div><span class="slot-time">'+s.time+'</span> <span style="color:#555;margin-left:8px;">'+s.date+'</span>'+(s.taken?' <span style="font-size:11px;color:#a02020;margin-left:6px;">занят: '+s.takenBy+'</span>':'')+'</div><button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;" onclick="CRM.deleteSlot('+realIdx+')">✕</button></div>';
   }).join(''):'<p style="color:#aaa;font-size:13px;padding:8px 0;">Нет предстоящих слотов.</p>';
-  var pastInfo=past.length?'<div style="font-size:11px;color:#aaa;margin-top:8px;">Прошедших слотов: '+past.length+' <button class="btn btn-sm" style="font-size:11px;" onclick="clearPastSlots()">Удалить прошедшие</button></div>':'';
+  var pastInfo=past.length?'<div style="font-size:11px;color:#aaa;margin-top:8px;">Прошедших слотов: '+past.length+' <button class="btn btn-sm" style="font-size:11px;" onclick="CRM.clearPastSlots()">Удалить прошедшие</button></div>':'';
   modal('<h2>📅 Мои слоты для встреч</h2>'+
     '<p style="font-size:12px;color:#666;margin-bottom:12px">Добавляй своё время (Уфа +5). В карточке кандидата нажми «Назначить встречу» чтобы выбрать слот.</p>'+
     '<div class="f2" style="margin-bottom:8px;">'+
     '<div class="fr"><label>Дата</label><input type="date" id="slotDate" value="'+lastDate+'"></div>'+
     '<div class="fr"><label>Время (Уфа +5)</label><input type="time" id="slotTime" value="10:00"></div>'+
     '</div>'+
-    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px;" onclick="addSlot()">+ Добавить слот</button>'+
+    '<button class="btn btn-primary" style="width:100%;margin-bottom:14px;" onclick="CRM.addSlot()">+ Добавить слот</button>'+
     '<div id="slotsList">'+rows+'</div>'+
     pastInfo+
-    '<div class="mfoot"><button class="btn" onclick="closeModal()">Закрыть</button></div>');
+    '<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
 }
 
 function clearPastSlots(){
@@ -429,7 +430,7 @@ function openBookSlot(candidateId){
     var realIdx=allSlots.findIndex(function(x){return x.dateRaw===s.dateRaw&&x.time===s.time&&!x.taken;});
     return '<div class="slot-item free" data-cid="'+candidateId+'" data-si="'+realIdx+'"><div><span class="slot-time">'+s.time+'</span> <span style="font-size:13px;color:#555;margin-left:8px;">'+s.date+'</span></div><span style="color:#2e7d32;font-size:13px;">✓ выбрать</span></div>';
   }).join('');
-  modal('<h2>📅 Выбери время встречи</h2><p style="font-size:12px;color:#666;margin-bottom:12px">'+cand.name+'</p>'+rows+'<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button></div>');
+  modal('<h2>📅 Выбери время встречи</h2><p style="font-size:12px;color:#666;margin-bottom:12px">'+cand.name+'</p>'+rows+'<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button></div>');
 }
 
 function bookSlot(cid,si){
@@ -455,7 +456,7 @@ function openSendInvite(cid,slot){
   var phone=(cand.contacts||'').replace(/\D/g,'');
   var waLink='https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(text);
   var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
-  modal('<h2>📨 Отправить приглашение</h2><div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="_blank" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="closeModal()">Закрыть</button></div>');
+  modal('<h2>📨 Отправить приглашение</h2><div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="_blank" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
     var b=document.getElementById('tgInvBtn');if(b)b.onclick=function(){copyText(document.getElementById('inviteText').innerText);window.open(tgLink,'_blank');};
     var cb=document.getElementById('copyInvBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('inviteText').innerText);};
@@ -510,10 +511,10 @@ function openOfficeInvite(cid){
   var mgrOptions='<option value="">— без руководителя —</option>'+mgrs.map(function(m,i){return '<option value="'+i+'">'+m.name+(m.company?' ('+m.company+')':'')+'</option>';}).join('');
 
   modal('<h2>🏢 Приглашение в офис</h2>'+
-    (mgrs.length?'<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;"><label style="font-size:13px;font-weight:600;white-space:nowrap;">Руководитель:</label><select id="mgrSelect" style="flex:1;padding:6px 8px;border:1px solid #c8d4e8;border-radius:6px;font-size:13px;">'+mgrOptions+'</select><button class="btn btn-primary" style="white-space:nowrap;" onclick="insertManager()">Вставить</button></div>':''+
+    (mgrs.length?'<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;"><label style="font-size:13px;font-weight:600;white-space:nowrap;">Руководитель:</label><select id="mgrSelect" style="flex:1;padding:6px 8px;border:1px solid #c8d4e8;border-radius:6px;font-size:13px;">'+mgrOptions+'</select><button class="btn btn-primary" style="white-space:nowrap;" onclick="CRM.insertManager()">Вставить</button></div>':''+
     '<p style="font-size:12px;color:#aaa;margin-bottom:10px;">Добавь руководителей в Настройки → Руководители</p>')+
     '<p style="font-size:12px;color:#666;margin-bottom:8px;">Отредактируй текст при необходимости.</p>'+
-    '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div class="mfoot"><button class="btn" onclick="closeModal()">Закрыть</button></div>');
+    '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
     var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
     var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'_blank');};
@@ -523,7 +524,7 @@ function openOfficeInvite(cid){
 
 // ── Закрыть вакансию ─────────────────────────────────────────────
 function openCloseVacancy(){
-  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Все активные кандидаты получат статус «Вакансия закрыта» и будут заархивированы.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="closeVacancy()">🔒 Закрыть вакансию</button></div>');
+  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Все активные кандидаты получат статус «Вакансия закрыта» и будут заархивированы.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="CRM.closeVacancy()">🔒 Закрыть вакансию</button></div>');
   var sel=document.getElementById('closeVacSel');
   function upd(){var v=sel.value,a=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===v;}).length,t=D.candidates.filter(function(c){return c.vacancy===v;}).length;var el=document.getElementById('closeVacCount');if(el)el.textContent='Активных: '+a+' из '+t;}
   sel.addEventListener('change',upd);upd();
@@ -619,7 +620,7 @@ function openBulkDelete(){
 <p style="font-size:13px;color:#666;margin-bottom:16px">Все кандидаты по выбранной вакансии будут удалены навсегда.</p>
 <div class="fr"><label>Вакансия</label><select id="delVac">${VACANCIES.map(v=>`<option>${v}</option>`).join('')}</select></div>
 <div id="delCount" style="font-size:13px;color:#888;margin-bottom:12px"></div>
-<div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn" style="background:#ffebee;border-color:#ef9a9a;color:#c62828;font-weight:600" onclick="bulkDelete()">🗑 Удалить всех</button></div>`);
+<div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#ffebee;border-color:#ef9a9a;color:#c62828;font-weight:600" onclick="CRM.bulkDelete()">🗑 Удалить всех</button></div>`);
   document.getElementById('delVac').addEventListener('change',updateDelCount);updateDelCount();
 }
 function updateDelCount(){const vac=document.getElementById('delVac')?.value;const count=D.candidates.filter(c=>c.vacancy===vac).length;const el=document.getElementById('delCount');if(el)el.textContent=`Будет удалено: ${count} кандидатов`;}
@@ -629,18 +630,18 @@ function openReport(){
   for(var mi=0;mi<6;mi++){var md=new Date(now2.getFullYear(),now2.getMonth()-mi,1);var my=md.getFullYear(),mm=String(md.getMonth()+1).padStart(2,'0');var ml=md.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});var mf=my+'-'+mm+'-01';var mld=new Date(my,md.getMonth()+1,0).getDate();var mt=my+'-'+mm+'-'+String(mld).padStart(2,'0');mba.push('<button class="btn month-btn" style="font-size:11px;padding:5px 10px;" data-from="'+mf+'" data-to="'+mt+'">'+ml+'</button>');}
   var mbh=mba.join('');
 
-  const vacOpts=`<label class="rdd-row" style="background:#f5f5f5;font-weight:600"><input type="checkbox" name="rVac" value="__all__" checked onchange="rVacAll(this)"> ✅ Все вакансии</label>`+VACANCIES.map(v=>`<label class="rdd-row"><input type="checkbox" name="rVac" value="${v}" onchange="rVacOne()"> ${v}</label>`).join('');
-  const stageOpts=STAGES.map(s=>`<label class="rdd-row"><input type="checkbox" name="rStage" value="${s}" onchange="rUpdateLbl('rStage','rStage_lbl','Все этапы')"> ${s}</label>`).join('');
-  const statusOpts=STATUSES.map(s=>`<label class="rdd-row"><input type="checkbox" name="rStatus" value="${s}" onchange="rUpdateLbl('rStatus','rStatus_lbl','Все статусы')"> ${s}</label>`).join('')+`<label class="rdd-row" style="background:#fff5f5;font-weight:600"><input type="checkbox" name="rStatus" value="__all_refuse__" onchange="rUpdateLbl('rStatus','rStatus_lbl','Все статусы')"> 🔴 Все отказы вместе</label>`;
+  const vacOpts=`<label class="rdd-row" style="background:#f5f5f5;font-weight:600"><input type="checkbox" name="rVac" value="__all__" checked onchange="CRM.rVacAll(this)"> ✅ Все вакансии</label>`+VACANCIES.map(v=>`<label class="rdd-row"><input type="checkbox" name="rVac" value="${v}" onchange="CRM.rVacOne()"> ${v}</label>`).join('');
+  const stageOpts=STAGES.map(s=>`<label class="rdd-row"><input type="checkbox" name="rStage" value="${s}" onchange="CRM.rUpdateLbl('rStage','rStage_lbl','Все этапы')"> ${s}</label>`).join('');
+  const statusOpts=STATUSES.map(s=>`<label class="rdd-row"><input type="checkbox" name="rStatus" value="${s}" onchange="CRM.rUpdateLbl('rStatus','rStatus_lbl','Все статусы')"> ${s}</label>`).join('')+`<label class="rdd-row" style="background:#fff5f5;font-weight:600"><input type="checkbox" name="rStatus" value="__all_refuse__" onchange="CRM.rUpdateLbl('rStatus','rStatus_lbl','Все статусы')"> 🔴 Все отказы вместе</label>`;
   modal(`<h2>📊 Отчёт по кандидатам</h2>
 <div style="margin-bottom:10px;"><div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;margin-bottom:6px;">Быстрый выбор периода:</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${mbh}</div></div>
 <div class="f2" style="margin-bottom:12px"><div class="fr"><label>Период от</label><input type="date" id="rFrom"></div><div class="fr"><label>Период до</label><input type="date" id="rTo" value="${todayStr()}"></div></div>
-<div class="fr"><label>Вакансии</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:180px;overflow-y:auto;padding:4px 0">${vacOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="rVacReset()">Все</button> <span id="rVac_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
+<div class="fr"><label>Вакансии</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:180px;overflow-y:auto;padding:4px 0">${vacOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="CRM.rVacReset()">Все</button> <span id="rVac_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
 <div class="f2" style="margin-top:10px">
-<div class="fr"><label>Этапы (пусто = все)</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:160px;overflow-y:auto;padding:4px 0">${stageOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="rClear('rStage','rStage_lbl','Все этапы')">Сбросить</button> <span id="rStage_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
-<div class="fr"><label>Статусы (пусто = все)</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:160px;overflow-y:auto;padding:4px 0">${statusOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="rClear('rStatus','rStatus_lbl','Все статусы')">Сбросить</button> <span id="rStatus_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
+<div class="fr"><label>Этапы (пусто = все)</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:160px;overflow-y:auto;padding:4px 0">${stageOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="CRM.rClear('rStage','rStage_lbl','Все этапы')">Сбросить</button> <span id="rStage_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
+<div class="fr"><label>Статусы (пусто = все)</label><div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-top:4px"><div style="max-height:160px;overflow-y:auto;padding:4px 0">${statusOpts}</div><div style="border-top:1px solid #eee;padding:4px 10px;background:#fafafa"><button class="btn btn-sm" onclick="CRM.rClear('rStatus','rStatus_lbl','Все статусы')">Сбросить</button> <span id="rStatus_lbl" style="font-size:11px;color:#888;margin-left:6px">Все</span></div></div></div>
 </div>
-<div class="mfoot" style="justify-content:space-between;margin-top:16px"><button class="btn" onclick="closeModal()">Закрыть</button><div style="display:flex;gap:8px"><button class="btn" style="background:#fff8e1;border-color:#f9a825;color:#e65100;font-weight:600" onclick="buildFunnel()">📈 Воронка</button><button class="btn btn-primary" onclick="buildReport()">Сформировать отчёт</button></div></div>
+<div class="mfoot" style="justify-content:space-between;margin-top:16px"><button class="btn" onclick="CRM.closeModal()">Закрыть</button><div style="display:flex;gap:8px"><button class="btn" style="background:#fff8e1;border-color:#f9a825;color:#e65100;font-weight:600" onclick="CRM.buildFunnel()">📈 Воронка</button><button class="btn btn-primary" onclick="CRM.buildReport()">Сформировать отчёт</button></div></div>
 <div id="reportResult" style="margin-top:16px"></div>`,true);
 }
 function rUpdateLbl(name,lblId,def){const checked=[...document.querySelectorAll(`[name=${name}]:checked`)].map(x=>x.value).filter(x=>x!=='__all_refuse__');const hasRef=document.querySelector(`[name=${name}][value="__all_refuse__"]`)?.checked;const parts=[...checked,(hasRef?'Все отказы':'')].filter(Boolean);const el=document.getElementById(lblId);if(el)el.textContent=parts.length?parts.join(', '):def;}
@@ -701,21 +702,21 @@ async function parsePDF(e){const file=e.target.files[0];if(!file)return;pendingP
 function openAdd(){
   const id=nextId();pendingPdfName='';
   modal(`<h2>➕ Новый кандидат</h2>
-<div class="upload-area" onclick="document.getElementById('pdfIn').click()">📄 Загрузить PDF резюме<input type="file" id="pdfIn" accept=".pdf" style="display:none" onchange="parsePDF(event)"></div>
+<div class="upload-area" onclick="document.getElementById('pdfIn').click()">📄 Загрузить PDF резюме<input type="file" id="pdfIn" accept=".pdf" style="display:none" onchange="CRM.parsePDF(event)"></div>
 <div class="section-title">Основные данные</div>
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
 <div class="fr"><label>ФИО *</label><input id="fn" placeholder="Фамилия Имя Отчество"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,'Менеджер по продажам')}</select></div><div class="fr"><label>Источник</label><input id="fs" placeholder="hh.ru"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuse" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
-<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveNew()">Добавить</button></div>`);
+<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>`);
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
@@ -735,24 +736,24 @@ function openEdit(id){
 <div class="fr"><label>ФИО</label><input id="fn" value="${c.name}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,c.vacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${c.source||''}"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phone}"></div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage(c.stage)}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="toggleRefuse(this,'editRefuse')">${sel(STATUSES,c.status)}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage(c.stage)}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'editRefuse')">${sel(STATUSES,c.status)}</select></div></div>
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
-<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
+<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt" value="${c.meetTime||''}"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco">${c.comment||''}</textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" value="${c.resumeLink||''}"></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" value="${c.hhLink||''}"></div>
 <div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:14px;border-top:1px solid #eee;">
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="saveEditThenHist('${id}')">📋 Событие</button>
-<button class="btn" style="color:#555;border-color:#ccc;" onclick="archiveCandidate('${id}')">🗄 Архив</button>
-<button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="deleteCandidate('${id}')">🗑 Удалить</button>
+<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
+<button class="btn" style="color:#555;border-color:#ccc;" onclick="CRM.archiveCandidate('${id}')">🗄 Архив</button>
+<button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="CRM.deleteCandidate('${id}')">🗑 Удалить</button>
 </div>
 <div style="display:flex;gap:6px;flex-wrap:wrap;" id="meetBtnsContainer_${id}">
 <span id="meetBtnsPlaceholder_${id}"></span>
-<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="saveEdit('${id}');setTimeout(function(){openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
-<button class="btn" onclick="closeModal()">Отмена</button>
-<button class="btn btn-primary" onclick="saveEdit('${id}')">💾 Сохранить</button>
+<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
+<button class="btn" onclick="CRM.closeModal()">Отмена</button>
+<button class="btn btn-primary" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
 </div>
 </div>
 ${(()=>{
@@ -766,9 +767,9 @@ ${(()=>{
   setTimeout(function(){
     var ph=document.getElementById('meetBtnsPlaceholder_'+id);if(!ph)return;
     ph.outerHTML=_hm?
-      '<button class="btn" style="background:#e3f2fd;color:#1565c0;border-color:#90caf9;" onclick="openSendInviteAgain(\''+id+'\')">📨 Повторить приглашение</button>'+
-      '<button class="btn" style="background:#fff3e0;color:#e65100;border-color:#ffcc80;" onclick="releaseSlot(\''+id+'\')">🔄 Изменить встречу</button>'
-      :'<button class="btn" style="background:#1976d2;color:#fff;border-color:#1976d2;font-weight:700;" onclick="openBookSlot(\''+id+'\')">📅 Назначить встречу</button>';
+      '<button class="btn" style="background:#e3f2fd;color:#1565c0;border-color:#90caf9;" onclick="CRM.openSendInviteAgain(\''+id+'\')">📨 Повторить приглашение</button>'+
+      '<button class="btn" style="background:#fff3e0;color:#e65100;border-color:#ffcc80;" onclick="CRM.releaseSlot(\''+id+'\')">🔄 Изменить встречу</button>'
+      :'<button class="btn" style="background:#1976d2;color:#fff;border-color:#1976d2;font-weight:700;" onclick="CRM.openBookSlot(\''+id+'\')">📅 Назначить встречу</button>';
   },80);
 }
 function saveEdit(id){
@@ -820,7 +821,7 @@ function openHist(id){
 <div class="fr"><label>Тип события</label><select id="he">${sel(EVENTS,'Интервью HR — назначено')}</select></div>
 <div class="fr"><label>Описание</label><textarea id="hds"></textarea></div>
 <div class="fr"><label>Результат</label><input id="hr"></div>
-<div class="mfoot"><button class="btn" onclick="openEdit('${id}')">← Назад</button><button class="btn btn-primary" onclick="saveHist('${id}')">Добавить</button></div>`);
+<div class="mfoot"><button class="btn" onclick="CRM.openEdit('${id}')">← Назад</button><button class="btn btn-primary" onclick="CRM.saveHist('${id}')">Добавить</button></div>`);
 }
 function saveHist(id){
   const c=D.candidates.find(x=>x.id===id);if(!c)return;
@@ -873,24 +874,133 @@ loadLocal();updateFVSelect();render();loadFromSheets();
 <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#2e7d32;display:flex;align-items:center;gap:8px;">
   ✅ Данные подгружены из HR-ассистента. Проверь и нажми «Добавить».
 </div>
-<div class="upload-area" onclick="document.getElementById('pdfInHR').click()">📄 Загрузить PDF резюме<input type="file" id="pdfInHR" accept=".pdf" style="display:none" onchange="parsePDF(event)"></div>
+<div class="upload-area" onclick="document.getElementById('pdfInHR').click()">📄 Загрузить PDF резюме<input type="file" id="pdfInHR" accept=".pdf" style="display:none" onchange="CRM.parsePDF(event)"></div>
 <div class="section-title">Основные данные</div>
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
 <div class="fr"><label>ФИО *</label><input id="fn" value="${nameEsc}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES, matchedVacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${sourceEsc}"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuseHR" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option>'+r+'</option>').join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
-<div class="mfoot"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveNew()">Добавить</button></div>
+<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>
 </div>`;
 
     const cleanUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
   }, 900);
+})();
+
+return {
+  addManager,
+  addSlot,
+  addVacancy,
+  applyStageFilter,
+  parsePDF,
+  applyStatusFilter,
+  archiveAllInactive,
+  archiveCandidate,
+  arrow,
+  autoFillNextStep,
+  bookSlot,
+  buildFunnel,
+  buildReport,
+  bulkDelete,
+  clearDate,
+  clearPastSlots,
+  clearStageFilter,
+  clearStatusFilter,
+  clearVacColor,
+  closeModal,
+  closeSettingsMenu,
+  closeVacancy,
+  copyText,
+  deleteCandidate,
+  deleteManager,
+  deleteSlot,
+  dlabel,
+  extractFromPDFText,
+  getChecked,
+  getManagers,
+  getReportPool,
+  getSlots,
+  getVacMeta,
+  getVacStyle,
+  importJSON,
+  insertManager,
+  isSameDay,
+  loadFromSheets,
+  loadLocal,
+  loadPDFJS,
+  modal,
+  mskTime,
+  nextId,
+  normalizeStatus,
+  openAdd,
+  openBookSlot,
+  openBulkDelete,
+  openCloseVacancy,
+  openEdit,
+  openHist,
+  openManagersSettings,
+  openOfficeInvite,
+  openReport,
+  openSendInvite,
+  openSendInviteAgain,
+  openSlotsManager,
+  openVacancySettings,
+  parseDate,
+  rClear,
+  rUpdateLbl,
+  rVacAll,
+  rVacOne,
+  rVacReset,
+  rclass,
+  releaseSlot,
+  removeVacancy,
+  render,
+  renderArchive,
+  renderHeaders,
+  renderHistory,
+  renderStats,
+  renderTable,
+  renderVacList,
+  saveData,
+  saveEdit,
+  saveEditThenHist,
+  saveHist,
+  saveLocal,
+  saveManagerEdits,
+  saveManagers,
+  saveNew,
+  saveSlots,
+  saveVacancies,
+  saveVacancyName,
+  sbadge,
+  sel,
+  selStage,
+  setReportMonth,
+  setSyncStatus,
+  setToday,
+  setVacColor,
+  setVacMeta,
+  showFunnelList,
+  sortBy,
+  stageLevel,
+  switchTab,
+  syncToSheets,
+  todayStr,
+  toggleDD,
+  toggleRefuse,
+  toggleSettingsMenu,
+  unarchiveCandidate,
+  updateDelCount,
+  updateFVSelect,
+  vacBadge
+};
 })();

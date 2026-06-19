@@ -1,3 +1,4 @@
+const HR = (function() {
 // ── Default prompts ───────────────────────────────────────────────
 const DEFAULT_PROMPTS = {
   resume: `РОЛЬ
@@ -229,7 +230,7 @@ function loadPDFJS() {
 function setPdfArea(status, text, sub) {
   const area = document.getElementById('pdf-area');
   area.className = 'pdf-upload-area' + (status ? ' ' + status : '');
-  area.innerHTML = `<input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="onFileSelected(event)">
+  area.innerHTML = `<input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="HR.onFileSelected(event)">
 <span class="pdf-icon">${status === 'loaded' ? '✅' : status === 'error' ? '⚠️' : '📄'}</span>
 <p><strong>${text}</strong></p>
 <p style="font-size:11px;color:var(--text3);margin-top:5px;">${sub}</p>`;
@@ -416,9 +417,9 @@ function showPanel(name) {
 (() => {
       const cand = currentCandidate();
       const hasAnalysis = cand && cand.rawAnalysis;
-      return '<button class="btn" onclick="resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
-        (hasAnalysis ? '<button class="btn" style="background:#FF6B35;color:#fff;border-color:#FF6B35;" onclick="archiveCandidate()"><i class="ti ti-x"></i> Отказ</button>' : '') +
-        '<button class="btn btn-danger" onclick="deleteCandidate()"><i class="ti ti-trash"></i> Удалить</button>';
+      return '<button class="btn" onclick="HR.resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
+        (hasAnalysis ? '<button class="btn" style="background:#FF6B35;color:#fff;border-color:#FF6B35;" onclick="HR.archiveCandidate()"><i class="ti ti-x"></i> Отказ</button>' : '') +
+        '<button class="btn btn-danger" onclick="HR.deleteCandidate()"><i class="ti ti-trash"></i> Удалить</button>';
     })();
   }
   renderCandidates();
@@ -454,7 +455,7 @@ function renderCandidates() {
   } else {
     badge = `<span class="cand-badge badge-new">новый</span>`;
   }
-    return `<div class="cand-item ${c.id === state.currentCandidateId ? 'active' : ''}" onclick="openCandidate('${c.id}')">
+    return `<div class="cand-item ${c.id === state.currentCandidateId ? 'active' : ''}" onclick="HR.openCandidate('${c.id}')">
 <div class="cand-name">${escHtml(c.name)}</div>
 <div class="cand-date">${c.date}</div>
       ${badge}
@@ -545,7 +546,7 @@ function resetAnalysis() {
   document.getElementById('resume-content').innerHTML =
     `<div style="text-align:center;padding:40px 20px;">
       <div style="color:var(--text3);font-size:13px;margin-bottom:16px;">Анализ сброшен. Запусти заново.</div>
-      <button class="btn btn-primary" onclick="reAnalyzeCandidate()">
+      <button class="btn btn-primary" onclick="HR.reAnalyzeCandidate()">
         <i class="ti ti-sparkles"></i> Проанализировать резюме
       </button>
     </div>`;
@@ -685,7 +686,7 @@ function resultBox(label, text) {
   return `<div class="ai-result">
 <div class="ai-result-label" style="display:flex;align-items:center;justify-content:space-between;">
   <span><i class="ti ti-sparkles"></i> ${label}</span>
-  <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="copyText(document.getElementById('${id}').innerText)"><i class="ti ti-copy"></i> Скопировать</button>
+  <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.copyText(document.getElementById('${id}').innerText)"><i class="ti ti-copy"></i> Скопировать</button>
 </div>
 <div id="${id}" style="white-space:pre-wrap;">${escHtml(text)}</div>
 </div>`;
@@ -881,7 +882,7 @@ function crmExportBox(candidateId) {
 <strong>Кандидат подходит?</strong>
       ${alreadyAdded ? '✅ Уже добавлен в CRM' : 'Добавь в CRM для дальнейшей работы'}
 </div>
-<button class="btn btn-crm" onclick="addToCRM('${candidateId}')" ${alreadyAdded ? 'style="opacity:0.6"' : ''}>
+<button class="btn btn-crm" onclick="HR.addToCRM('${candidateId}')" ${alreadyAdded ? 'style="opacity:0.6"' : ''}>
 <i class="ti ti-database-plus"></i> ${alreadyAdded ? 'Открыть CRM' : 'Добавить в CRM'}
 </button>
 </div>`;
@@ -1017,7 +1018,7 @@ function showSavedRating() {
   if (saved) {
     el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
       '<span style="font-size:11px;color:var(--text3);">💾 Сохранённый рейтинг от ' + saved.date + '</span>' +
-      '<button class="btn btn-danger" style="font-size:11px;padding:3px 10px;" onclick="deleteSavedRatingAndClear()">🗑 Удалить</button>' +
+      '<button class="btn btn-danger" style="font-size:11px;padding:3px 10px;" onclick="HR.deleteSavedRatingAndClear()">🗑 Удалить</button>' +
       '</div>' +
       resultBox('Рейтинг — ' + saved.vacTitle, saved.text);
   } else {
@@ -1290,3 +1291,78 @@ window.addEventListener('hh_resume_ready', checkIncomingResume);
 window.addEventListener('message', (e) => {
   if (e.data && e.data.action === 'resume') applyIncomingResume(e.data);
 });
+
+return {
+  addToCRM,
+  callAPI,
+  parsePDF,
+  analyzeInterview,
+  analyzeResume,
+  applyIncomingResume,
+  applyLoaded,
+  archiveCandidate,
+  buildPrompt,
+  buildRating,
+  changeVacancy,
+  checkIncomingResume,
+  clearAllData,
+  clearRatingSelection,
+  closeModal,
+  copyText,
+  createVacancy,
+  crmExportBox,
+  currentCandidate,
+  currentVacancy,
+  decodeFromSheets,
+  deleteCandidate,
+  deleteSavedRating,
+  deleteSavedRatingAndClear,
+  deleteVacancy,
+  encodeForSheets,
+  errorBox,
+  escHtml,
+  extractNameFromText,
+  extractPhoneFromText,
+  fillVacancyForm,
+  filteredCandidates,
+  generateQuestions,
+  getSavedRatings,
+  load,
+  loadFromSheets,
+  loadPDFJS,
+  newVacancy,
+  onDragLeave,
+  onDragOver,
+  onDrop,
+  onFileSelected,
+  onVacancyChange,
+  openCandidate,
+  populateRatingPanel,
+  quickAddToCRM,
+  reAnalyzeCandidate,
+  renderCandidates,
+  renderRatingCandidates,
+  renderVacancySelect,
+  resetAnalysis,
+  resetPrompt,
+  resultBox,
+  runComparison,
+  save,
+  savePrompt,
+  saveRating,
+  saveSettings,
+  saveVacancy,
+  selectAllForRating,
+  setPdfArea,
+  showCompareFromNew,
+  showPanel,
+  showSavedRating,
+  switchTab,
+  syncStatus,
+  syncToSheets,
+  toast,
+  toggleArchiveView,
+  updateCopyBtn,
+  vacancyContext
+};
+})();
