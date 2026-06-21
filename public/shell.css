@@ -23,5 +23,5 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif
 .shell-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
 .shell-tab.active { background: #eef2f7; color: #1F3864; }
 
-.view { display: none; height: calc(100vh - 38px); overflow: hidden; }
+.view { display: none; height: calc(100vh - 38px); overflow-y: auto; }
 .view.active { display: block; }
