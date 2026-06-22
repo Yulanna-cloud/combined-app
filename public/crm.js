@@ -538,7 +538,8 @@ function emailInvite(cid, body, subject, statusElId){
     return;
   }
   if(statusEl) statusEl.innerHTML='<span style="color:#888;">⏳ Отправляю на '+cand.email+'...</span>';
-  fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'sendEmail',to:cand.email,subject:subject,body:body})})
+  var emailBody=body+'\n\n---\nЭто автоматическое уведомление, отвечать на него не нужно.';
+  fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'sendEmail',to:cand.email,subject:subject,body:emailBody})})
     .then(function(r){return r.json();})
     .then(function(res){
       if(res&&res.ok){
