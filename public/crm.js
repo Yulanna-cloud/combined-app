@@ -709,9 +709,9 @@ function openAdd(){
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,'Менеджер по продажам')}</select></div><div class="fr"><label>Источник</label><input id="fs" placeholder="hh.ru"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuse" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option>${r}</option>`).join('')}</select></div>
-<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd"></div></div>
+<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
@@ -876,9 +876,9 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vac
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES, matchedVacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${sourceEsc}"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuseHR" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option>'+r+'</option>').join('')}</select></div>
-<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd"></div></div>
+<div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
