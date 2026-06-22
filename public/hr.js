@@ -825,14 +825,16 @@ function quickAddToCRM() {
   const resume = document.getElementById('c-resume').value.trim();
   if (!name) { toast('Заполни имя кандидата'); return; }
 
-  // Извлекаем телефон и email
-  let phone = '';
-  if (resume) {
-    const m = resume.match(/(?:\+7|8)[\s\-\(\)]*(\ d{3})[\s\-\(\)]*(\ d{3})[\s\-\(\)]*(\ d{2})[\s\-\(\)]*(\ d{2})/);
+  // Если кандидат уже был автосохранён расширением — берём его телефон/email напрямую,
+  // не дожидаясь регулярки (она ловит только то, что явно есть в тексте резюме).
+  const already = state.candidates.find(x => x.name === name && !x.archived);
+  let phone = (already && already.phone) || '';
+  if (!phone && resume) {
+    const m = resume.match(/(?:\+7|8)[\s\-\(\)]*(\d{3})[\s\-\(\)]*(\d{3})[\s\-\(\)]*(\d{2})[\s\-\(\)]*(\d{2})/);
     if (m) phone = '+7' + m[1] + m[2] + m[3] + m[4];
   }
-  let email = '';
-  if (resume) {
+  let email = (already && already.email) || '';
+  if (!email && resume) {
     const me = resume.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
     if (me) email = me[0];
   }
