@@ -1,5 +1,5 @@
 const CRM = (function() {
-const SHEETS_URL='https://script.google.com/macros/s/AKfycbz4bRHeOTKV9Be1sSiF2EYa1Q_n8h6kqIdGRLMYkYZwJ3-z6kraaB0L6rCvwPWaqD7S/exec';
+const SHEETS_URL='https://script.google.com/macros/s/AKfycbzLAnP96uykzXSoaB0LvTAw-_rRQmlhb79mx73ertJnqCPLz-mgwy-DIoKCKISbKbOo/exec';
 function toggleSettingsMenu(){
   const m=document.getElementById('settingsMenu');
   m.style.display=m.style.display==='block'?'none':'block';
