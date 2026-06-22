@@ -820,17 +820,22 @@ function quickAddToCRM() {
   const resume = document.getElementById('c-resume').value.trim();
   if (!name) { toast('Заполни имя кандидата'); return; }
 
-  // Извлекаем телефон
+  // Извлекаем телефон и email
   let phone = '';
   if (resume) {
     const m = resume.match(/(?:\+7|8)[\s\-\(\)]*(\ d{3})[\s\-\(\)]*(\ d{3})[\s\-\(\)]*(\ d{2})[\s\-\(\)]*(\ d{2})/);
     if (m) phone = '+7' + m[1] + m[2] + m[3] + m[4];
   }
+  let email = '';
+  if (resume) {
+    const me = resume.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    if (me) email = me[0];
+  }
 
   // Сохраняем кандидата в ассистент
   const id = 'c_' + Date.now();
   const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  state.candidates.unshift({ id, name, resume, date, vacancyId: state.currentVacancyId, archived: false, resumeHTML: '', rawAnalysis: '', verdict: '', hasQuestions: false, interviewDone: false, addedToCrm: true });
+  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: false, resumeHTML: '', rawAnalysis: '', verdict: '', hasQuestions: false, interviewDone: false, addedToCrm: true });
   state.currentCandidateId = id;
   save();
   renderCandidates();
@@ -838,7 +843,7 @@ function quickAddToCRM() {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Кандидат сохранён, открываю CRM...');
 }
@@ -850,17 +855,22 @@ function addToCRM(candidateId) {
 
   const v = state.vacancies.find(x => x.id === c.vacancyId);
 
-  // Извлекаем телефон из текста резюме
-  let phone = '';
-  if (c.resume) {
+  // Телефон и email: используем уже сохранённые на кандидате, либо извлекаем из текста резюме
+  let phone = c.phone || '';
+  if (!phone && c.resume) {
     const m = c.resume.match(/(?:\+7|8)[\s\-\(\)]*(\d{3})[\s\-\(\)]*(\d{3})[\s\-\(\)]*(\d{2})[\s\-\(\)]*(\d{2})/);
     if (m) phone = '+7' + m[1] + m[2] + m[3] + m[4];
+  }
+  let email = c.email || '';
+  if (!email && c.resume) {
+    const me = c.resume.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    if (me) email = me[0];
   }
 
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  CRM.addCandidateFromHR({ name: c.name, phone, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Открываю CRM...');
 }
@@ -1195,7 +1205,7 @@ function applyIncomingResume(payload) {
   if (!payload || !payload.action) return;
   if (payload.action !== 'resume') return;
 
-  const { name, phone, vacancy, resume, ts } = payload;
+  const { name, phone, email, vacancy, resume, ts } = payload;
 
   // Проверяем что данные свежие (не старше 10 минут)
   if (ts && Date.now() - ts > 600000) return;
@@ -1234,7 +1244,7 @@ function applyIncomingResume(payload) {
       const autoId = 'c_' + Date.now();
       const autoDate = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
       state.candidates.unshift({
-        id: autoId, name, resume, date: autoDate,
+        id: autoId, name, resume, date: autoDate, phone: phone || '', email: email || '',
         vacancyId: state.currentVacancyId, archived: false,
         resumeHTML: '', rawAnalysis: '', verdict: '',
         hasQuestions: false, interviewDone: false, addedToCrm: false, qFocus: ''
@@ -1246,6 +1256,8 @@ function applyIncomingResume(payload) {
     } else {
       // Обновляем резюме если изменилось
       if (resume && !exists.resume) exists.resume = resume;
+      if (email && !exists.email) exists.email = email;
+      if (phone && !exists.phone) exists.phone = phone;
       state.currentCandidateId = exists.id;
       save();
     }

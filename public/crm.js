@@ -509,17 +509,50 @@ function openOfficeInvite(cid){
   // Build manager selector
   var mgrs=getManagers();
   var mgrOptions='<option value="">— без руководителя —</option>'+mgrs.map(function(m,i){return '<option value="'+i+'">'+m.name+(m.company?' ('+m.company+')':'')+'</option>';}).join('');
+  var emailBtnHtml='<button id="offEmailBtn" class="btn btn-primary"'+(cand.email?'':' disabled')+' style="background:'+(cand.email?'#D32F2F':'#ccc')+';border-color:'+(cand.email?'#D32F2F':'#ccc')+';'+(cand.email?'':'cursor:not-allowed;')+'" title="'+(cand.email?('Отправить на '+cand.email):'У кандидата не указан email — добавь его в карточке кандидата')+'">📧 Email</button>';
 
   modal('<h2>🏢 Приглашение в офис</h2>'+
     (mgrs.length?'<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;"><label style="font-size:13px;font-weight:600;white-space:nowrap;">Руководитель:</label><select id="mgrSelect" style="flex:1;padding:6px 8px;border:1px solid #c8d4e8;border-radius:6px;font-size:13px;">'+mgrOptions+'</select><button class="btn btn-primary" style="white-space:nowrap;" onclick="CRM.insertManager()">Вставить</button></div>':''+
     '<p style="font-size:12px;color:#aaa;margin-bottom:10px;">Добавь руководителей в Настройки → Руководители</p>')+
     '<p style="font-size:12px;color:#666;margin-bottom:8px;">Отредактируй текст при необходимости.</p>'+
-    '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+    '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button>'+emailBtnHtml+'<button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div id="offEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
     var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
     var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'_blank');};
     var cb=document.getElementById('copyOffBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('officeText').value);};
+    var eb=document.getElementById('offEmailBtn');if(eb)eb.onclick=function(){
+      var subject='Приглашение на встречу — вакансия '+(cand.vacancy||'');
+      emailInvite(cand.id, document.getElementById('officeText').value, subject, 'offEmailStatus');
+    };
   },100);
+}
+
+// ── Отправка приглашения на email через Google Apps Script (GmailApp.sendEmail) ──
+function emailInvite(cid, body, subject, statusElId){
+  var statusEl=statusElId?document.getElementById(statusElId):null;
+  var cand=D.candidates.find(function(x){return x.id===cid;});
+  if(!cand) return;
+  if(!cand.email){
+    if(statusEl) statusEl.innerHTML='<span style="color:#c62828;">❌ У кандидата не указан email — добавь его в карточке кандидата.</span>';
+    else alert('У кандидата не указан email. Добавь его в карточке кандидата.');
+    return;
+  }
+  if(statusEl) statusEl.innerHTML='<span style="color:#888;">⏳ Отправляю на '+cand.email+'...</span>';
+  fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'sendEmail',to:cand.email,subject:subject,body:body})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res&&res.ok){
+        if(statusEl) statusEl.innerHTML='<span style="color:#2e7d32;">✅ Письмо отправлено на '+cand.email+'</span>';
+        else alert('✅ Письмо отправлено на '+cand.email);
+      } else {
+        if(statusEl) statusEl.innerHTML='<span style="color:#c62828;">❌ Не удалось отправить: '+((res&&res.error)||'ошибка сервера')+'</span>';
+        else alert('❌ Не удалось отправить письмо');
+      }
+    })
+    .catch(function(){
+      if(statusEl) statusEl.innerHTML='<span style="color:#c62828;">❌ Нет связи с сервером отправки</span>';
+      else alert('❌ Нет связи с сервером отправки');
+    });
 }
 
 // ── Закрыть вакансию ─────────────────────────────────────────────
@@ -708,6 +741,7 @@ function openAdd(){
 <div class="fr"><label>ФИО *</label><input id="fn" placeholder="Фамилия Имя Отчество"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,'Менеджер по продажам')}</select></div><div class="fr"><label>Источник</label><input id="fs" placeholder="hh.ru"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div>
+<div class="fr"><label>📧 Email</label><input id="femail" placeholder="ivan@mail.ru"></div>
 <div class="section-title">Воронка</div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuse" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option>${r}</option>`).join('')}</select></div>
@@ -720,7 +754,7 @@ function openAdd(){
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Отклик',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||''});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Отклик',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||''});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -736,6 +770,7 @@ function openEdit(id){
 <div class="fr"><label>ФИО</label><input id="fn" value="${c.name}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,c.vacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${c.source||''}"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phone}"></div>
+<div class="fr"><label>📧 Email</label><input id="femail" value="${c.email||''}"></div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage(c.stage)}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'editRefuse')">${sel(STATUSES,c.status)}</select></div></div>
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
@@ -777,7 +812,7 @@ function saveEdit(id){
   // Запоминаем старый этап и статус для истории
   const oldStage=c.stage||'';
   const oldStatus=c.status||'';
-  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.resumeLink=document.getElementById('frl')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.hhLink=document.getElementById('fhh')?.value||'';
+  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.resumeLink=document.getElementById('frl')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.hhLink=document.getElementById('fhh')?.value||'';
   if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;
   if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';
   // Автоматически записываем событие если изменился этап или статус
@@ -842,7 +877,7 @@ loadLocal();updateFVSelect();render();loadFromSheets();
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vacancyFromHR, source: sourceFromHR }) {
+function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, source: sourceFromHR }) {
   if (!nameFromHR) return;
 
   const id = nextId();
@@ -860,6 +895,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vac
 
   const nameEsc = nameFromHR.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const phoneEsc = (phoneFromHR || '').replace(/"/g, '&quot;');
+  const emailEsc = (emailFromHR || '').replace(/"/g, '&quot;');
   const sourceEsc = (sourceFromHR || 'HR-ассистент').replace(/"/g, '&quot;');
 
   document.getElementById('mdl').style.display = 'flex';
@@ -875,6 +911,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, vacancy: vac
 <div class="fr"><label>ФИО *</label><input id="fn" value="${nameEsc}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES, matchedVacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${sourceEsc}"></div></div>
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div>
+<div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div>
 <div class="section-title">Воронка</div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuseHR" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option>'+r+'</option>').join('')}</select></div>
@@ -913,6 +950,7 @@ return {
   addSlot,
   addVacancy,
   applyStageFilter,
+  emailInvite,
   parsePDF,
   applyStatusFilter,
   archiveAllInactive,
