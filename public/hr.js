@@ -614,14 +614,19 @@ function switchTab(tab) {
   if (tab === 'rawresume') {
     const c = currentCandidate();
     const el = document.getElementById('rawresume-content');
-    if (c && c.resume) {
-      el.textContent = c.resume;
-    } else {
-      el.textContent = 'Текст резюме не сохранён';
-    }
+    el.value = (c && c.resume) || '';
   }
   // Показываем кнопку копирования для нужных вкладок
   updateCopyBtn(tab);
+}
+
+function saveRawResume() {
+  const c = currentCandidate();
+  if (!c) return;
+  c.resume = document.getElementById('rawresume-content').value.trim();
+  save();
+  syncToSheets();
+  toast('Резюме сохранено');
 }
 
 function copyText(text) {
@@ -1299,6 +1304,7 @@ return {
   addToCRM,
   callAPI,
   parsePDF,
+  saveRawResume,
   analyzeInterview,
   analyzeResume,
   applyIncomingResume,

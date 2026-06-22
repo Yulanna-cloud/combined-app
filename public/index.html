@@ -210,10 +210,12 @@
         </div>
         <div id="tab-rawresume" style="display:none;">
           <div class="ai-result-label" style="margin-bottom:8px;"><i class="ti ti-file-text"></i> Текст резюме</div>
-          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <p class="field-hint" style="margin-bottom:8px;">Можно вставить или отредактировать текст резюме вручную — анализ ИИ при этом не запускается.</p>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;">
+            <button class="btn btn-primary" style="font-size:11px;padding:3px 10px;" onclick="HR.saveRawResume()"><i class="ti ti-check"></i> Сохранить</button>
             <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.copyText(HR.currentCandidate()?.resume)"><i class="ti ti-copy"></i> Скопировать резюме</button>
           </div>
-          <div id="rawresume-content" style="background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);height:calc(100vh - 260px);overflow-y:auto;"></div>
+          <textarea id="rawresume-content" style="width:100%;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);height:calc(100vh - 280px);resize:none;"></textarea>
         </div>
         <div id="tab-interview" style="display:none;">
           <div class="field"><label>Транскрипт или заметки интервью</label><textarea id="i-transcript" style="height:calc(100vh - 380px);min-height:200px;resize:none;" placeholder="Вставь запись интервью..."></textarea></div>

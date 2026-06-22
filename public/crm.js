@@ -545,6 +545,9 @@ function emailInvite(cid, body, subject, statusElId){
       if(res&&res.ok){
         if(statusEl) statusEl.innerHTML='<span style="color:#2e7d32;">✅ Письмо отправлено на '+cand.email+'</span>';
         else alert('✅ Письмо отправлено на '+cand.email);
+        D.history.unshift({date:todayStr(),cid:cand.id,name:cand.name,vacancy:cand.vacancy||'',event:'Письмо отправлено',desc:'На '+cand.email+' · '+subject,result:'',resp:'Я'});
+        saveData();
+        renderHistory();
       } else {
         if(statusEl) statusEl.innerHTML='<span style="color:#c62828;">❌ Не удалось отправить: '+((res&&res.error)||'ошибка сервера')+'</span>';
         else alert('❌ Не удалось отправить письмо');
