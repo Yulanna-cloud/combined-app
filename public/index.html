@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="shell.css">
 <link rel="stylesheet" href="hr.css">
 <link rel="stylesheet" href="crm.css">
+<link rel="stylesheet" href="analytics.css">
 </head>
 <body>
 
@@ -17,6 +18,9 @@
   </button>
   <button class="shell-tab" id="shell-tab-crm" onclick="switchView('crm')">
     <i class="ti ti-database"></i> CRM
+  </button>
+  <button class="shell-tab" id="shell-tab-analytics" onclick="switchView('analytics');ANALYTICS.render()">
+    <i class="ti ti-chart-bar"></i> Аналитика
   </button>
 </div>
 
@@ -360,15 +364,22 @@
 
 </div>
 
+<div id="view-analytics" class="view">
+  <div id="analytics-content"></div>
+</div>
+
 <script>
 function switchView(name) {
   document.getElementById('view-hr').classList.toggle('active', name === 'hr');
   document.getElementById('view-crm').classList.toggle('active', name === 'crm');
+  document.getElementById('view-analytics').classList.toggle('active', name === 'analytics');
   document.getElementById('shell-tab-hr').classList.toggle('active', name === 'hr');
   document.getElementById('shell-tab-crm').classList.toggle('active', name === 'crm');
+  document.getElementById('shell-tab-analytics').classList.toggle('active', name === 'analytics');
 }
 </script>
 <script src="hr.js"></script>
 <script src="crm.js"></script>
+<script src="analytics.js"></script>
 </body>
 </html>
