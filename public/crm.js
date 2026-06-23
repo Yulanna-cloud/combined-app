@@ -47,6 +47,46 @@ function addCustomer(name){
 }
 function getCustomerName(id){const c=CUSTOMERS.find(x=>x.id===id);return c?c.name:'';}
 const VACANCY_STATUSES=['В работе','На паузе','Закрыта','Отменена'];
+
+function openCustomersSettings(){
+  var rows=CUSTOMERS.length?CUSTOMERS.map(function(c,i){
+    var vacCount=VACANCIES.filter(function(v){return getVacMeta(v).customerId===c.id;}).length;
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'+
+      '<input class="cust-name" data-i="'+i+'" type="text" value="'+c.name+'" placeholder="Название заказчика" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
+      '<span style="font-size:11px;color:#888;white-space:nowrap;">вакансий: '+vacCount+'</span>'+
+      '<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;flex-shrink:0;" onclick="CRM.deleteCustomer('+i+')">✕</button>'+
+      '</div>';
+  }).join(''):'<p style="color:#aaa;font-size:13px;margin-bottom:10px;">Нет заказчиков.</p>';
+
+  modal('<h2>🏛 Заказчики</h2>'+
+    '<p style="font-size:12px;color:#666;margin-bottom:14px">Заказчик привязывается к вакансии в «Управление вакансиями».</p>'+
+    '<div id="custList">'+rows+'</div>'+
+    '<div style="display:flex;gap:6px;margin-top:8px;margin-bottom:16px;">'+
+    '<input id="newCustName" type="text" placeholder="Название заказчика" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
+    '<button class="btn btn-primary" onclick="CRM.addCustomerUI()" style="flex-shrink:0;">+ Добавить</button>'+
+    '</div>'+
+    '<div class="mfoot"><button class="btn" onclick="CRM.saveCustomerEdits();CRM.closeModal()">Сохранить и закрыть</button></div>');
+}
+function addCustomerUI(){
+  var name=document.getElementById('newCustName').value.trim();
+  if(!name){alert('Введи название заказчика');return;}
+  addCustomer(name);
+  document.getElementById('newCustName').value='';
+  openCustomersSettings();
+}
+function deleteCustomer(i){
+  var c=CUSTOMERS[i];if(!c)return;
+  var vacCount=VACANCIES.filter(function(v){return getVacMeta(v).customerId===c.id;}).length;
+  if(vacCount>0&&!confirm('У этого заказчика '+vacCount+' вакансий — они останутся без заказчика. Удалить?'))return;
+  CUSTOMERS.splice(i,1);saveCustomers();openCustomersSettings();renderVacList();
+}
+function saveCustomerEdits(){
+  document.querySelectorAll('.cust-name').forEach(function(el){
+    var i=parseInt(el.getAttribute('data-i'));
+    if(CUSTOMERS[i])CUSTOMERS[i].name=el.value.trim();
+  });
+  saveCustomers();
+}
 function getVacStyle(v){
   const c=VAC_COLORS[v];
   if(!c)return null;
@@ -81,8 +121,11 @@ function renderVacList(){
   const el=document.getElementById('vacList');if(!el)return;
   el.innerHTML=VACANCIES.map((v,i)=>{
     const s=getVacStyle(v);
+    const meta=getVacMeta(v);
     const colorDots=COLOR_PRESETS.map(p=>`<span class="color-swatch" style="background:${p.bg};border-color:${p.fg}${s&&s.bg===p.bg?';outline:2px solid #333':''}" title="${p.name}" onclick="CRM.setVacColor(${i},'${p.bg}|${p.fg}')"></span>`).join('');
     const clearBtn=s?`<span class="color-swatch" style="background:#fff;border-color:#ccc" title="Без цвета" onclick="CRM.clearVacColor(${i})">✕</span>`:'';
+    const custOpts='<option value="">— без заказчика —</option>'+CUSTOMERS.map(c=>`<option value="${c.id}"${meta.customerId===c.id?' selected':''}>${c.name}</option>`).join('');
+    const statusOpts=VACANCY_STATUSES.map(st=>`<option${meta.status===st?' selected':''}>${st}</option>`).join('');
     return `<div style="padding:8px 0;border-bottom:1px solid #f0f0f0">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
 <input value="${v}" id="vac_${i}" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px">
@@ -94,7 +137,19 @@ function renderVacList(){
         ${colorDots}${clearBtn}
         ${s?`<span style="background:${s.bg};color:${s.fg};border-radius:8px;padding:2px 8px;font-size:11px;font-weight:600">${v}</span>`:''}
 </div>
-</div>\n<div style="display:flex;gap:6px;margin-top:6px;padding:0 4px;" class="vac-meta-row"><input type="text" placeholder="Ссылка HH (заполни один раз)" class="vac-meta-input" data-vac="${v}" data-field="hhLink" value="${getVacMeta(v).hhLink}" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;"><input type="text" placeholder="Сайт компании" class="vac-meta-input" data-vac="${v}" data-field="siteUrl" value="${getVacMeta(v).siteUrl}" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;"></div>`;
+<div style="display:flex;gap:6px;margin-top:6px;padding:0 4px;" class="vac-meta-row"><input type="text" placeholder="Ссылка HH (заполни один раз)" class="vac-meta-input" data-vac="${v}" data-field="hhLink" value="${meta.hhLink}" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;"><input type="text" placeholder="Сайт компании" class="vac-meta-input" data-vac="${v}" data-field="siteUrl" value="${meta.siteUrl}" style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;"></div>
+<div style="display:flex;gap:6px;margin-top:6px;padding:0 4px;flex-wrap:wrap;" class="vac-meta-row">
+<select class="vac-meta-input" data-vac="${v}" data-field="customerId" style="flex:1;min-width:140px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">${custOpts}</select>
+<select class="vac-meta-input" data-vac="${v}" data-field="status" style="flex:1;min-width:110px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">${statusOpts}</select>
+<input type="number" min="0" placeholder="План найма" class="vac-meta-input" data-vac="${v}" data-field="planHires" value="${meta.planHires}" style="width:90px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
+</div>
+<div style="display:flex;gap:6px;margin-top:6px;padding:0 4px;flex-wrap:wrap;align-items:center;" class="vac-meta-row">
+<span style="font-size:11px;color:#888;white-space:nowrap;">Открыта:</span>
+<input type="date" class="vac-meta-input" data-vac="${v}" data-field="openedDate" value="${meta.openedDate}" style="flex:1;min-width:120px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
+<span style="font-size:11px;color:#888;white-space:nowrap;">Закрыта:</span>
+<input type="date" class="vac-meta-input" data-vac="${v}" data-field="closedDate" value="${meta.closedDate}" style="flex:1;min-width:120px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
+</div>
+</div>`;
   }).join('');
 }
 function setVacColor(i,colorStr){
@@ -670,10 +725,12 @@ function closeVacancy(){
 }
 
 // ── Делегирование событий ─────────────────────────────────────────
-document.addEventListener('input',function(e){
+function handleVacMetaInput(e){
   var mi=e.target.closest('.vac-meta-input');
   if(mi){setVacMeta(mi.getAttribute('data-vac'),mi.getAttribute('data-field'),mi.value);}
-});
+}
+document.addEventListener('input',handleVacMetaInput);
+document.addEventListener('change',handleVacMetaInput);
 
 document.addEventListener('click',function(e){
   var slotEl=e.target.closest('[data-cid][data-si]');
@@ -1019,12 +1076,16 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 
 return {
   addCandidateFromHR,
+  addCustomerUI,
   addManager,
   addSlot,
   addVacancy,
   applyStageFilter,
+  deleteCustomer,
   emailInvite,
+  openCustomersSettings,
   parsePDF,
+  saveCustomerEdits,
   applyStatusFilter,
   archiveAllInactive,
   archiveCandidate,
