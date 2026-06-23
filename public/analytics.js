@@ -11,7 +11,9 @@ const ANALYTICS = (function () {
     'Работает': 7
   };
   const STAGE_ORDER = Object.keys(LEVEL_MAP);
-  const HIRED_STATUS = 'Трудоустроен';
+  const STARTED_STATUS = 'Трудоустроен';
+  const CONFIRMED_STATUS = 'Подтверждён после адаптации';
+  const HIRED_STATUSES_LIST = [STARTED_STATUS, CONFIRMED_STATUS];
 
   // Текущее состояние фильтров (живёт между перерисовками)
   let filters = { customerId: '', vacancy: '', period: 'all', from: '', to: '' };
@@ -111,7 +113,7 @@ const ANALYTICS = (function () {
       const active = vacs.filter(v => getMeta(vacMeta, v).status === 'В работе').length;
       const closed = vacs.filter(v => getMeta(vacMeta, v).status === 'Закрыта').length;
       const cands = candidates.filter(c => vacs.includes(c.vacancy));
-      const hired = cands.filter(c => c.status === HIRED_STATUS).length;
+      const hired = cands.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
       return { name: cust.name, vacCount: vacs.length, active, closed, candCount: cands.length, hired };
     });
   }
@@ -123,7 +125,7 @@ const ANALYTICS = (function () {
       const cands = candidates.filter(c => c.vacancy === v);
       const interviews = cands.filter(c => levelOf(c.stage) >= 2).length;
       const offers = cands.filter(c => levelOf(c.stage) >= 5).length;
-      const hires = cands.filter(c => c.status === HIRED_STATUS).length;
+      const hires = cands.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
       const opened = parseDate(meta.openedDate);
       const closed = parseDate(meta.closedDate);
       let ageDays = '—';
@@ -171,7 +173,7 @@ const ANALYTICS = (function () {
       const src = (c.source || '').trim() || 'Без источника';
       if (!map[src]) map[src] = { source: src, total: 0, hired: 0 };
       map[src].total++;
-      if (c.status === HIRED_STATUS) map[src].hired++;
+      if (HIRED_STATUSES_LIST.includes(c.status)) map[src].hired++;
     });
     return Object.values(map).map(s => ({ ...s, conv: s.total ? Math.round((s.hired / s.total) * 100) : 0 }))
       .sort((a, b) => b.total - a.total);
@@ -187,6 +189,14 @@ const ANALYTICS = (function () {
     });
     const avg = rows.length ? Math.round(rows.reduce((a, b) => a + b.days, 0) / rows.length) : null;
     return { avg, rows };
+  }
+
+  // ── Retention: вышел на работу → подтверждён после адаптации ──
+  function reportRetention(pool) {
+    const started = pool.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
+    const confirmed = pool.filter(c => c.status === CONFIRMED_STATUS).length;
+    const pct = started ? Math.round((confirmed / started) * 100) : null;
+    return { started, confirmed, pct };
   }
 
   function bar(label, count, pct, colorClass) {
@@ -254,7 +264,7 @@ const ANALYTICS = (function () {
 
     const total = pool.length;
     const active = pool.filter(c => !c.archived).length;
-    const hired = pool.filter(c => c.status === HIRED_STATUS).length;
+    const hired = pool.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
 
     let html = renderFilters(vacancies, vacMeta, customers);
 
@@ -313,6 +323,17 @@ const ANALYTICS = (function () {
     } else {
       html += '<div class="an-empty" style="padding:10px 0;">Нет закрытых вакансий с заполненными датами открытия/закрытия</div>';
     }
+    html += '</div>';
+
+    // 6. Retention: вышел на работу → подтверждён после адаптации
+    const retention = reportRetention(pool);
+    html += '<div class="an-section-title">🔄 Retention (испытательный срок)</div><div class="an-card">';
+    html += '<div class="an-stats">' +
+      '<div class="an-stat"><div class="an-stat-n">' + retention.started + '</div><div class="an-stat-l">Вышли на работу</div></div>' +
+      '<div class="an-stat"><div class="an-stat-n">' + retention.confirmed + '</div><div class="an-stat-l">Подтверждены после адаптации</div></div>' +
+      '<div class="an-stat"><div class="an-stat-n">' + (retention.pct != null ? retention.pct + '%' : '—') + '</div><div class="an-stat-l">Retention</div></div>' +
+      '</div>';
+    if (!retention.started) html += '<div class="an-empty" style="padding:10px 0;">Нет вышедших на работу в выборке</div>';
     html += '</div>';
 
     root.innerHTML = html;
