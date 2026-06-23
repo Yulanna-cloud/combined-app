@@ -32,8 +32,21 @@ const COLOR_PRESETS=[
 ];
 let VAC_META=JSON.parse(localStorage.getItem('crm_vac_meta')||'{}');
 function saveVacancies(){localStorage.setItem('crm_vacancies',JSON.stringify(VACANCIES));localStorage.setItem('crm_vac_colors',JSON.stringify(VAC_COLORS));localStorage.setItem('crm_vac_meta',JSON.stringify(VAC_META));}
-function getVacMeta(vac){return VAC_META[vac]||{hhLink:'',siteUrl:''};}
+function getVacMeta(vac){return VAC_META[vac]||{hhLink:'',siteUrl:'',customerId:'',status:'В работе',openedDate:'',closedDate:'',planHires:''};}
 function setVacMeta(vac,field,val){if(!VAC_META[vac])VAC_META[vac]={};VAC_META[vac][field]=val;saveVacancies();}
+
+// ── Заказчики ─────────────────────────────────────────────────────
+let CUSTOMERS=JSON.parse(localStorage.getItem('crm_customers')||'null')||[{id:'cust_default',name:'ЭнергоПромСервис'}];
+function saveCustomers(){localStorage.setItem('crm_customers',JSON.stringify(CUSTOMERS));}
+function addCustomer(name){
+  if(!name||!name.trim())return null;
+  const id='cust_'+Date.now();
+  CUSTOMERS.push({id,name:name.trim()});
+  saveCustomers();
+  return id;
+}
+function getCustomerName(id){const c=CUSTOMERS.find(x=>x.id===id);return c?c.name:'';}
+const VACANCY_STATUSES=['В работе','На паузе','Закрыта','Отменена'];
 function getVacStyle(v){
   const c=VAC_COLORS[v];
   if(!c)return null;
@@ -133,6 +146,7 @@ function loadFromSheets(){
         D.candidates=res.data.candidates.map(c=>({...c,status:normalizeStatus(c.status),archived:localMap[c.id]||c.archived||false}));
       }
       if(res.data.history)D.history=res.data.history;
+      migrateDataV2();
       saveLocal();render();setSyncStatus('✅ Загружено!','ok');
     }else setSyncStatus('❌ Ошибка загрузки','err');
   };
@@ -144,22 +158,99 @@ function normalizeStatus(s){
   if(!s)return s;
   if(s==='Отказался сам'||s==='Отказалась сама')return 'Отказался сам (кандидат)';
   if(s==='Не вышла на собес')return 'Не вышел на собеседование';
-  return s;
+  // Миграция старых статусов на новую модель (Оффер/Вышел/Вакансия закрыта — теперь не статусы кандидата)
+  const map={
+    'Отказался сам (кандидат)':'Отказался кандидат',
+    'Отказалась сама (кандидат)':'Отказался кандидат',
+    'Отказ':'Отказ заказчика',
+    'Не вышел на собеседование':'Не пришел на интервью',
+    'Вышел':'Трудоустроен',
+    'Оффер':'В работе',
+    'Вакансия закрыта':'Не вышел на работу'
+  };
+  return map[s]??s;
 }
-const STAGES=['Отклик','Интервью HR — назначено','Интервью HR — проведено','Интервью с РОП — назначено','Интервью с РОП — проведено','Оффер','Обучение','Работает'];
-const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Отказался сам (кандидат)','Отказ','Оффер','Вышел','Не вышел на собеседование','Вакансия закрыта'];
-const EVENTS=['Добавлен кандидат','Интервью HR — назначено','Интервью HR — проведено','Интервью с РОП — назначено','Интервью с РОП — проведено','Оффер отправлен','Оффер принят','Отказался сам (кандидат)','Отказ компании','Выход на работу'];
-const REFUSE_REASONS=['','Слабый','Не пришёл на интервью','Не подходит доход','Принял другой оффер','Нерелевантный опыт','Другое'];
-const INACTIVE=['Отказ','Отказался сам (кандидат)','Вышел','Не вышел на собеседование','Вакансия закрыта'];
-const REFUSE_STATUSES=['Отказ','Отказался сам (кандидат)','Не вышел на собеседование'];
+function migrateStage(s){
+  const map={
+    'Отклик':'Скрининг',
+    'Интервью HR':'Интервью HR проведено',
+    'Интервью HR — назначено':'Интервью HR назначено',
+    'Интервью HR — проведено':'Интервью HR проведено',
+    'Интервью с РОП — назначено':'Интервью заказчика назначено',
+    'Интервью с РОП — проведено':'Интервью заказчика проведено',
+    'Интервью с руководителем':'Интервью заказчика проведено',
+    'Финал':'Интервью заказчика проведено',
+    'Оффер':'Оффер',
+    'Обучение':'Обучение',
+    'Работает':'Работает'
+  };
+  return map[s]??'Скрининг';
+}
+function migrateRefuseReason(s){
+  const map={
+    '':'',
+    'Слабый':'Низкая квалификация',
+    'Слабая':'Низкая квалификация',
+    'Нерелевантный опыт':'Низкая квалификация',
+    'Не подходит доход':'Высокие зарплатные ожидания',
+    'Принял другой оффер':'Контроффер',
+    'Приняла другой оффер':'Контроффер',
+    'Не пришёл на интервью':'',
+    'Не пришла на интервью':'',
+    'Другое':'Другое'
+  };
+  if(s in map) return map[s];
+  return s?'Другое':'';
+}
+// Вакансии прошлой компании — данные по ним можно безвозвратно потерять при миграции
+const OLD_COMPANY_VACANCIES=['Менеджер по продажам','РОП','Project Manager'];
+
+const STAGES=['Скрининг','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер','Обучение','Работает'];
+const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу','Трудоустроен'];
+const EVENTS=['Добавлен кандидат','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер отправлен','Оффер принят','Отказ кандидата','Отказ заказчика','Выход на работу'];
+const REFUSE_REASONS=['','Низкая квалификация','Высокие зарплатные ожидания','Не подходит график','Не подходит локация','Контроффер','Передумал','Не прошел интервью заказчика','Другое'];
+const INACTIVE=['Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу','Трудоустроен'];
+const REFUSE_STATUSES=['Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу'];
 function stageLevel(stage){
-  const map={'Отклик':0,'Интервью HR — назначено':1,'Интервью HR':2,'Интервью HR — проведено':2,'Интервью с РОП — назначено':3,'Интервью с руководителем':4,'Финал':4,'Интервью с РОП — проведено':4,'Оффер':5,'Обучение':6,'Работает':7,'Выход':7};
+  const map={'Скрининг':0,'Интервью HR назначено':1,'Интервью HR проведено':2,'Интервью заказчика назначено':3,'Интервью заказчика проведено':4,'Оффер':5,'Обучение':6,'Работает':7};
   return map[stage]??0;
 }
+
+// ── Миграция на новую модель данных ──────────────────────────────
+// Удаляет кандидатов прошлой компании (по списку вакансий) и приводит
+// этапы/статусы/причины отказа оставшихся к новой модели. Идемпотентна —
+// безопасно запускать при каждой загрузке (и из localStorage, и из облака),
+// иначе при следующем "Загрузить" старые данные вернутся обратно.
+function migrateDataV2(){
+  const keepIds=new Set();
+  D.candidates=D.candidates.filter(c=>{
+    if(OLD_COMPANY_VACANCIES.includes(c.vacancy)) return false;
+    keepIds.add(c.id);
+    return true;
+  });
+  D.candidates.forEach(c=>{
+    c.stage=migrateStage(c.stage);
+    c.refuseReason=migrateRefuseReason(c.refuseReason);
+  });
+  D.history=D.history.filter(h=>!h.cid||keepIds.has(h.cid));
+
+  // Чистим сам список вакансий от прошлой компании, остальным назначаем заказчика по умолчанию
+  const vacBefore=VACANCIES.length;
+  VACANCIES=VACANCIES.filter(v=>!OLD_COMPANY_VACANCIES.includes(v));
+  let vacChanged=vacBefore!==VACANCIES.length;
+  VACANCIES.forEach(v=>{
+    if(!VAC_META[v]) VAC_META[v]={};
+    if(!VAC_META[v].customerId){ VAC_META[v].customerId='cust_default'; vacChanged=true; }
+    if(!VAC_META[v].status){ VAC_META[v].status='В работе'; vacChanged=true; }
+  });
+  if(vacChanged) saveVacancies();
+}
+
 let D={candidates:[],history:[]};
 function loadLocal(){
   try{const s=localStorage.getItem('crm_candidates');if(s){const p=JSON.parse(s);if(Array.isArray(p))D.candidates=p.map(c=>({...c,status:normalizeStatus(c.status)}));}}catch(e){D.candidates=[];}
   try{const s=localStorage.getItem('crm_history');if(s){const p=JSON.parse(s);if(Array.isArray(p))D.history=p;}}catch(e){D.history=[];}
+  migrateDataV2();
 }
 function saveLocal(){localStorage.setItem('crm_candidates',JSON.stringify(D.candidates));localStorage.setItem('crm_history',JSON.stringify(D.history));}
 function saveData(){saveLocal();syncToSheets();}
@@ -169,9 +260,9 @@ function isSameDay(ds){const d=parseDate(ds);if(!d)return false;const t=new Date
 function nextId(){if(!D.candidates.length)return 'K-001';const nums=D.candidates.map(c=>parseInt(c.id.replace(/\D/g,''))||0);return 'K-'+String(Math.max(...nums)+1).padStart(3,'0');}
 function sel(opts,val){return opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');}
 function selStage(val){const opts=[...STAGES];if(val&&!opts.includes(val))opts.push(val);return opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');}
-function toggleRefuse(s,divId){const d=document.getElementById(divId);if(d)d.style.display=['Отказ','Отказался сам (кандидат)'].includes(s.value)?'block':'none';}
+function toggleRefuse(s,divId){const d=document.getElementById(divId);if(d)d.style.display=REFUSE_STATUSES.includes(s.value)?'block':'none';}
 function sbadge(s){
-  const m={'В работе':'bw','Перенос собеседования':'bpurple','Оффер':'bo','Вышел':'bout','Отказ':'br','Отказался сам (кандидат)':'brs','Не вышел на собеседование':'bnv','Недозвон':'bnedozvon','Перезвон':'bperezv','Вакансия закрыта':'bvclosed'};
+  const m={'В работе':'bw','Перенос собеседования':'bpurple','Трудоустроен':'bout','Отказ заказчика':'br','Отказался кандидат':'brs','Не пришел на интервью':'bnv','Не вышел на работу':'bvclosed','Недозвон':'bnedozvon','Перезвон':'bperezv'};
   return `<span class="badge ${m[s]||'bdef'}">${s}</span>`;
 }
 function dlabel(ds){const d=parseDate(ds);if(!d)return '';const today=new Date();today.setHours(0,0,0,0);d.setHours(0,0,0,0);const diff=Math.round((d-today)/86400000);const cls=diff<0?'dr':diff===0?'dy':'dg';return `<span class="dot ${cls}"></span>${d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}`;}
@@ -345,14 +436,14 @@ function autoFillNextStep(stage, dateRaw) {
   }
 
   const map = {
-    'Отклик':                      'Назначить видео-интервью с HR',
-    'Интервью HR — назначено':     'Видео-интервью' + dateStr,
-    'Интервью HR — проведено':     'Назначить встречу с РОП',
-    'Интервью с РОП — назначено':  'Встреча в офисе' + dateStr,
-    'Интервью с РОП — проведено':  'Решение по кандидату, ОС',
-    'Оффер':                       'Дата выхода:' + dateStr,
-    'Обучение':                    'Дата начала обучения:' + dateStr,
-    'Работает':                    ''
+    'Скрининг':                          'Назначить видео-интервью с HR',
+    'Интервью HR назначено':             'Видео-интервью' + dateStr,
+    'Интервью HR проведено':             'Назначить встречу с заказчиком',
+    'Интервью заказчика назначено':      'Встреча в офисе' + dateStr,
+    'Интервью заказчика проведено':      'Решение по кандидату, ОС',
+    'Оффер':                             'Дата выхода:' + dateStr,
+    'Обучение':                          'Дата начала обучения:' + dateStr,
+    'Работает':                          ''
   };
 
   if (stage in map) {
@@ -561,7 +652,7 @@ function emailInvite(cid, body, subject, statusElId){
 
 // ── Закрыть вакансию ─────────────────────────────────────────────
 function openCloseVacancy(){
-  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Все активные кандидаты получат статус «Вакансия закрыта» и будут заархивированы.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="CRM.closeVacancy()">🔒 Закрыть вакансию</button></div>');
+  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Вакансия получит статус «Закрыта», все активные кандидаты по ней — статус «Не вышел на работу» и будут заархивированы.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="CRM.closeVacancy()">🔒 Закрыть вакансию</button></div>');
   var sel=document.getElementById('closeVacSel');
   function upd(){var v=sel.value,a=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===v;}).length,t=D.candidates.filter(function(c){return c.vacancy===v;}).length;var el=document.getElementById('closeVacCount');if(el)el.textContent='Активных: '+a+' из '+t;}
   sel.addEventListener('change',upd);upd();
@@ -570,9 +661,10 @@ function openCloseVacancy(){
 function closeVacancy(){
   var vac=document.getElementById('closeVacSel')&&document.getElementById('closeVacSel').value;if(!vac)return;
   var active=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===vac;});
-  if(!active.length){alert('Нет активных кандидатов.');return;}
-  if(!confirm('Закрыть «'+vac+'»? '+active.length+' кандидатов будут заархивированы.'))return;
-  active.forEach(function(c){c.status='Вакансия закрыта';c.archived=true;});
+  if(!confirm('Закрыть «'+vac+'»?'+(active.length?' '+active.length+' активных кандидатов будут заархивированы.':'')))return;
+  active.forEach(function(c){c.status='Не вышел на работу';c.archived=true;});
+  setVacMeta(vac,'status','Закрыта');
+  setVacMeta(vac,'closedDate',todayStr());
   D.history.push({date:todayStr(),cid:'',name:'Вакансия: '+vac,vacancy:vac,event:'Вакансия закрыта',desc:'Закрыто '+active.length+' кандидатов',result:'',resp:'Я'});
   saveData();closeModal();render();
 }
@@ -626,10 +718,10 @@ function buildFunnel(){
     return '<tr style="border-bottom:1px solid #e8ecf0'+(green?';background:#f0fff4':'')+'"><td style="padding:11px 14px;font-weight:600;font-size:13px">'+icon+' '+label+'</td><td style="padding:11px 14px;text-align:center;">'+nc+'</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#888">'+pct(n,base)+'</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#555">'+(prev>0?pct(n,prev):'—')+'</td></tr>';
   }
   const hrAC=pool.filter(c=>reached(c,1)),hrA=hrAC.length;
-  const hrNS=pool.filter(c=>stageLevel(c.stage)===1&&c.status==='Не вышел на собеседование').length;
+  const hrNS=pool.filter(c=>stageLevel(c.stage)===1&&c.status==='Не пришел на интервью').length;
   const hrDC=pool.filter(c=>reached(c,2)),hrD=hrDC.length;
   const ropAC=pool.filter(c=>reached(c,3)),ropA=ropAC.length;
-  const ropNS=pool.filter(c=>stageLevel(c.stage)===3&&c.status==='Не вышел на собеседование').length;
+  const ropNS=pool.filter(c=>stageLevel(c.stage)===3&&c.status==='Не пришел на интервью').length;
   const ropDC=pool.filter(c=>reached(c,4)),ropD=ropDC.length;
   const ofC=pool.filter(c=>reached(c,5)),ofN=ofC.length;
   const trC=pool.filter(c=>reached(c,6)),trN=trC.length;
@@ -639,8 +731,8 @@ function buildFunnel(){
     '<div class="section-title" style="margin-top:0">📈 Воронка '+(period?'— '+period:'')+' | '+vacLabel+'</div>'+
     '<div style="background:#fff;border:1px solid #c8d4e8;border-radius:8px;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#1F3864;color:#fff"><th style="padding:10px 14px;text-align:left">Этап</th><th style="padding:10px 14px;text-align:center">Кол-во</th><th style="padding:10px 14px;text-align:center">% от откликов</th><th style="padding:10px 14px;text-align:center">% от пред. этапа</th></tr></thead><tbody>'+
     '<tr style="background:#e3f2fd;border-bottom:1px solid #e8ecf0"><td style="padding:11px 14px;font-weight:700">📥 Отклики</td><td style="padding:11px 14px;text-align:center;font-size:22px;font-weight:700;color:#1F3864">'+total+'</td><td style="padding:11px 14px;text-align:center;color:#888">100%</td><td style="padding:11px 14px;text-align:center;color:#888">—</td></tr>'+
-    fRow('🗣️','Интервью HR — назначено',hrA,total,total,false,hrAC)+fRow('✅','Интервью HR — проведено',hrD,hrA,total,true,hrDC)+
-    fRow('👔','Интервью с РОП — назначено',ropA,hrD,total,false,ropAC)+fRow('✅','Интервью с РОП — проведено',ropD,ropA,total,true,ropDC)+
+    fRow('🗣️','Интервью HR назначено',hrA,total,total,false,hrAC)+fRow('✅','Интервью HR проведено',hrD,hrA,total,true,hrDC)+
+    fRow('👔','Интервью заказчика назначено',ropA,hrD,total,false,ropAC)+fRow('✅','Интервью заказчика проведено',ropD,ropA,total,true,ropDC)+
     fRow('📄','Оффер',ofN,ropD,total,false,ofC)+fRow('🎓','Обучение — начали',trN,ofN,total,false,trC)+fRow('🏆','Вышел на работу',wkN,trN,total,true,wkC)+
     '</tbody></table></div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
@@ -705,32 +797,9 @@ function buildReport(){
   let rows=pool;
   if(selStages.length)rows=rows.filter(c=>selStages.includes(c.stage));
   if(effectiveStatuses.length)rows=rows.filter(c=>effectiveStatuses.includes(c.status));
-  const total=rows.length,refused=rows.filter(c=>REFUSE_STATUSES.includes(c.status)).length,selfRefuse=rows.filter(c=>c.status==='Отказался сам (кандидат)').length,noShow=rows.filter(c=>c.status==='Не вышел на собеседование').length,compRefuse=rows.filter(c=>c.status==='Отказ').length,training=rows.filter(c=>['Обучение','Работает','Выход'].includes(c.stage)).length,offer=rows.filter(c=>['Оффер','Обучение','Работает','Выход'].includes(c.stage)).length,inWork=rows.filter(c=>c.status==='В работе').length;
+  const total=rows.length,refused=rows.filter(c=>REFUSE_STATUSES.includes(c.status)).length,selfRefuse=rows.filter(c=>c.status==='Отказался кандидат').length,noShow=rows.filter(c=>c.status==='Не пришел на интервью').length,compRefuse=rows.filter(c=>c.status==='Отказ заказчика').length,training=rows.filter(c=>['Обучение','Работает'].includes(c.stage)).length,offer=rows.filter(c=>['Оффер','Обучение','Работает'].includes(c.stage)).length,inWork=rows.filter(c=>c.status==='В работе').length;
   const tableRows=rows.map(c=>`<tr><td>${c.id}</td><td>${c.name}</td><td>${c.vacancy}</td><td>${c.stage}</td><td>${c.status}</td><td>${c.added||''}</td></tr>`).join('');
   document.getElementById('reportResult').innerHTML=`<div class="section-title" style="margin-top:0">Результат</div><div class="report-grid"><div class="report-card blue"><div class="report-card-n">${total}</div><div class="report-card-l">Всего</div></div><div class="report-card"><div class="report-card-n">${inWork}</div><div class="report-card-l">В работе</div></div><div class="report-card orange"><div class="report-card-n">${offer}</div><div class="report-card-l">Оффер</div></div><div class="report-card green"><div class="report-card-n">${training}</div><div class="report-card-l">На обучении</div></div><div class="report-card red"><div class="report-card-n">${refused}</div><div class="report-card-l">Всего отказов</div></div><div class="report-card red"><div class="report-card-n">${selfRefuse}</div><div class="report-card-l">Отказался сам</div></div><div class="report-card red"><div class="report-card-n">${noShow}</div><div class="report-card-l">Не вышел на собес</div></div><div class="report-card red"><div class="report-card-n">${compRefuse}</div><div class="report-card-l">Отказ компании</div></div></div>${total>0?`<div class="report-detail"><table><thead><tr><th>ID</th><th>ФИО</th><th>Вакансия</th><th>Этап</th><th>Статус</th><th>Добавлен</th></tr></thead><tbody>${tableRows}</tbody></table></div>`:'<div class="empty">Нет кандидатов</div>'}`;
-}
-function buildFunnel(){
-  const pool=getReportPool();
-  const from=document.getElementById('rFrom').value,to=document.getElementById('rTo').value;
-  const selVacs=[...document.querySelectorAll('[name=rVac]:checked')].map(x=>x.value);
-  const allVac=selVacs.includes('__all__')||selVacs.length===0;
-  const period=(from?`с ${from.split('-').reverse().join('.')} `:'')+(to?`по ${to.split('-').reverse().join('.')}` :'');
-  const vacLabel=allVac?'Все вакансии':selVacs.filter(x=>x!=='__all__').join(', ');
-  const total=pool.length;
-  function reached(c,level){return stageLevel(c.stage)>=level;}
-  const hrAssigned=pool.filter(c=>reached(c,1)).length;
-  const hrNoShow=pool.filter(c=>stageLevel(c.stage)===1&&c.status==='Не вышел на собеседование').length;
-  const hrDone=pool.filter(c=>reached(c,2)).length;
-  const ropAssigned=pool.filter(c=>reached(c,3)).length;
-  const ropNoShow=pool.filter(c=>stageLevel(c.stage)===3&&c.status==='Не вышел на собеседование').length;
-  const ropDone=pool.filter(c=>reached(c,4)).length;
-  const offerCount=pool.filter(c=>reached(c,5)).length;
-  const trainCount=pool.filter(c=>reached(c,6)).length;
-  const workCount=pool.filter(c=>reached(c,7)).length;
-  const totalRefuse=pool.filter(c=>REFUSE_STATUSES.includes(c.status)).length;
-  function pct(a,b){return b>0?Math.round(a/b*100)+'%':'—';}
-  function fRow(icon,label,n,prev,base,green){return `<tr style="border-bottom:1px solid #e8ecf0${green?';background:#f0fff4':''}"><td style="padding:11px 14px;font-weight:600;font-size:13px">${icon} ${label}</td><td style="padding:11px 14px;text-align:center;font-size:20px;font-weight:700;color:#1F3864">${n}</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#888">${pct(n,base)}</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#555">${prev>0?pct(n,prev):'—'}</td></tr>`;}
-  document.getElementById('reportResult').innerHTML=`<div class="section-title" style="margin-top:0">📈 Воронка ${period?'— '+period:''} | ${vacLabel}</div><div style="background:#fff;border:1px solid #c8d4e8;border-radius:8px;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#1F3864;color:#fff"><th style="padding:10px 14px;text-align:left">Этап</th><th style="padding:10px 14px;text-align:center">Кол-во</th><th style="padding:10px 14px;text-align:center">% от откликов</th><th style="padding:10px 14px;text-align:center">% от пред. этапа</th></tr></thead><tbody><tr style="background:#e3f2fd;border-bottom:1px solid #e8ecf0"><td style="padding:11px 14px;font-weight:700">📥 Отклики</td><td style="padding:11px 14px;text-align:center;font-size:22px;font-weight:700;color:#1F3864">${total}</td><td style="padding:11px 14px;text-align:center;color:#888">100%</td><td style="padding:11px 14px;text-align:center;color:#888">—</td></tr>${fRow('🗣️','Интервью HR — назначено',hrAssigned,total,total,false)}${fRow('✅','Интервью HR — проведено',hrDone,hrAssigned,total,true)}${fRow('👔','Интервью с РОП — назначено',ropAssigned,hrDone,total,false)}${fRow('✅','Интервью с РОП — проведено',ropDone,ropAssigned,total,true)}${fRow('📄','Оффер',offerCount,ropDone,total,false)}${fRow('🎓','Обучение — начали',trainCount,offerCount,total,false)}${fRow('🏆','Вышел на работу',workCount,trainCount,total,true)}</tbody></table></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div class="report-card red"><div class="report-card-n">${totalRefuse}</div><div class="report-card-l">Всего отказов</div></div><div class="report-card red"><div class="report-card-n">${hrNoShow+ropNoShow}</div><div class="report-card-l">Не вышли на собес</div></div><div class="report-card green"><div class="report-card-n">${workCount}</div><div class="report-card-l">Вышли на работу ✅</div></div></div>`;
 }
 let pendingPdfName='';
 function loadPDFJS(){return new Promise((resolve,reject)=>{if(typeof pdfjsLib!=='undefined'){resolve();return;}const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';s.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';resolve();};s.onerror=reject;document.head.appendChild(s);});}
@@ -747,7 +816,7 @@ function openAdd(){
 <div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div>
 <div class="fr"><label>📧 Email</label><input id="femail" placeholder="ivan@mail.ru"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Скрининг')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuse" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
@@ -758,7 +827,7 @@ function openAdd(){
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Отклик',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||''});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||''});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -857,7 +926,7 @@ function openHist(id){
   const c=D.candidates.find(x=>x.id===id);if(!c)return;
   modal(`<h2>📋 Событие — ${c.name}</h2>
 <div class="fr"><label>Дата</label><input type="date" id="hd" value="${todayStr()}"></div>
-<div class="fr"><label>Тип события</label><select id="he">${sel(EVENTS,'Интервью HR — назначено')}</select></div>
+<div class="fr"><label>Тип события</label><select id="he">${sel(EVENTS,'Интервью HR назначено')}</select></div>
 <div class="fr"><label>Описание</label><textarea id="hds"></textarea></div>
 <div class="fr"><label>Результат</label><input id="hr"></div>
 <div class="mfoot"><button class="btn" onclick="CRM.openEdit('${id}')">← Назад</button><button class="btn btn-primary" onclick="CRM.saveHist('${id}')">Добавить</button></div>`);
@@ -917,7 +986,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 <div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div>
 <div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div>
 <div class="section-title">Воронка</div>
-<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Отклик')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
+<div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Скрининг')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuseHR" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option>'+r+'</option>').join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
