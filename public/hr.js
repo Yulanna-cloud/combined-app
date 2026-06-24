@@ -305,17 +305,29 @@ function fillVacancyForm() {
   document.getElementById('v-desc').value = v.desc || '';
   document.getElementById('v-company').value = v.company || '';
   document.getElementById('v-notes').value = v.notes || '';
+  document.getElementById('v-pub-source').value = v.pubSource || '';
+  document.getElementById('v-pub-cost').value = v.pubCost || '';
+  document.getElementById('v-pub-opened').value = v.pubOpened || '';
+  document.getElementById('v-pub-closed').value = v.pubClosed || '';
+  document.getElementById('v-pub-responses').value = v.pubResponses || '';
 }
 
 function saveVacancy() {
   const title = document.getElementById('v-title').value.trim();
   if (!title) { alert('Укажи название вакансии'); return; }
+  const pub = {
+    pubSource: document.getElementById('v-pub-source').value,
+    pubCost: document.getElementById('v-pub-cost').value,
+    pubOpened: document.getElementById('v-pub-opened').value,
+    pubClosed: document.getElementById('v-pub-closed').value,
+    pubResponses: document.getElementById('v-pub-responses').value
+  };
   if (state.currentVacancyId) {
     const v = currentVacancy();
-    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.company = document.getElementById('v-company').value; v.notes = document.getElementById('v-notes').value; }
+    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.company = document.getElementById('v-company').value; v.notes = document.getElementById('v-notes').value; Object.assign(v, pub); }
   } else {
     const id = 'v_' + Date.now();
-    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, company: document.getElementById('v-company').value, notes: document.getElementById('v-notes').value });
+    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, company: document.getElementById('v-company').value, notes: document.getElementById('v-notes').value, ...pub });
     state.currentVacancyId = id;
   }
   save(); renderVacancySelect(); renderCandidates(); toast('Вакансия сохранена');
@@ -331,7 +343,7 @@ function createVacancy() {
   const name = document.getElementById('modal-vac-name').value.trim();
   if (!name) { alert('Введи название'); return; }
   const id = 'v_' + Date.now();
-  state.vacancies.push({ id, title: name, desc: '', company: '', notes: '' });
+  state.vacancies.push({ id, title: name, desc: '', company: '', notes: '', pubSource: '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: '' });
   state.currentVacancyId = id;
   save(); closeModal(); renderVacancySelect(); fillVacancyForm();
   showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + name;

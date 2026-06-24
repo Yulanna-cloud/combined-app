@@ -94,6 +94,17 @@
         <div class="field"><label>Описание вакансии (требования, задачи, условия)</label><textarea id="v-desc" rows="7" placeholder="Вставь полный текст вакансии..."></textarea></div>
         <div class="field"><label>О компании</label><textarea id="v-company" rows="3" placeholder="ЭнергоПромСервис — инжиниринговая компания, Казань..."></textarea></div>
         <div class="field"><label>Твои комментарии</label><textarea id="v-notes" rows="4" placeholder="Например: важна самостоятельная работа в Гранд-Смете, опыт по ЭОМ обязателен..."></textarea></div>
+        <hr class="divider">
+        <div class="section-title">Размещение публикации</div>
+        <div style="display:flex;gap:12px;">
+          <div class="field" style="flex:1;"><label>Источник</label><input type="text" id="v-pub-source" placeholder="Например: HH.ru"></div>
+          <div class="field" style="flex:1;"><label>Стоимость размещения</label><input type="text" id="v-pub-cost" placeholder="Например: 5000 руб."></div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <div class="field" style="flex:1;"><label>Дата открытия публикации</label><input type="date" id="v-pub-opened"></div>
+          <div class="field" style="flex:1;"><label>Дата закрытия публикации</label><input type="date" id="v-pub-closed"></div>
+        </div>
+        <div class="field"><label>Количество откликов</label><input type="number" min="0" id="v-pub-responses" placeholder="Вписать вручную"></div>
         <button class="btn btn-primary btn-full" onclick="HR.saveVacancy()"><i class="ti ti-check"></i> Сохранить вакансию</button>
       </div>
 
