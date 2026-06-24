@@ -1007,20 +1007,42 @@ loadLocal();updateFVSelect();render();loadFromSheets();
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, source: sourceFromHR }) {
+function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, source: sourceFromHR }) {
   if (!nameFromHR) return;
 
   const id = nextId();
   pendingPdfName = '';
 
-  let matchedVacancy = VACANCIES[0] || '';
+  // Ищем вакансию в CRM по названию из HR-ассистента; если такой вакансии
+  // в CRM ещё нет — создаём её автоматически (заполнять дважды не нужно).
+  let matchedVacancy = '';
   if (vacancyFromHR) {
     const exact = VACANCIES.find(v => v.toLowerCase() === vacancyFromHR.toLowerCase());
     const partial = VACANCIES.find(v =>
       v.toLowerCase().includes(vacancyFromHR.toLowerCase()) ||
       vacancyFromHR.toLowerCase().includes(v.toLowerCase())
     );
-    matchedVacancy = exact || partial || VACANCIES[0] || '';
+    matchedVacancy = exact || partial || '';
+    if (!matchedVacancy) {
+      matchedVacancy = vacancyFromHR;
+      VACANCIES.push(matchedVacancy);
+      saveVacancies();
+      updateFVSelect();
+    }
+  }
+  if (!matchedVacancy) matchedVacancy = VACANCIES[0] || '';
+
+  // Привязываем заказчика по названию компании из HR-вакансии — находим
+  // существующего по имени или создаём нового, но только если у вакансии
+  // заказчик ещё не назначен (чтобы не перетирать ручную настройку в CRM).
+  if (customerName && customerName.trim()) {
+    const meta = getVacMeta(matchedVacancy);
+    if (!meta.customerId) {
+      const trimmed = customerName.trim();
+      let cust = CUSTOMERS.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+      const custId = cust ? cust.id : addCustomer(trimmed);
+      setVacMeta(matchedVacancy, 'customerId', custId);
+    }
   }
 
   const nameEsc = nameFromHR.replace(/"/g, '&quot;').replace(/'/g, '&#39;');

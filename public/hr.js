@@ -850,7 +850,7 @@ function quickAddToCRM() {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Кандидат сохранён, открываю CRM...');
 }
@@ -877,7 +877,7 @@ function addToCRM(candidateId) {
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Открываю CRM...');
 }
