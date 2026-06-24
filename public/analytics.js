@@ -34,6 +34,23 @@ const ANALYTICS = (function () {
   function loadVacMeta() { return loadJSON('crm_vac_meta', {}); }
   function loadCustomers() { const a = loadJSON('crm_customers', []); return Array.isArray(a) ? a : [{ id: 'cust_default', name: 'ЭнергоПромСервис' }]; }
 
+  // Поля размещения публикации (источник/стоимость/даты/отклики) хранятся
+  // в HR-ассистенте на его собственных вакансиях, не в CRM.
+  function loadHrVacancies() {
+    const state = loadJSON('hr_eps_v2', null);
+    return state && Array.isArray(state.vacancies) ? state.vacancies : [];
+  }
+  function getPubInfo(hrVacancies, vacTitle) {
+    const v = hrVacancies.find(x => (x.title || '').toLowerCase() === (vacTitle || '').toLowerCase());
+    return {
+      source: (v && v.pubSource) || '',
+      cost: (v && v.pubCost) || '',
+      opened: (v && v.pubOpened) || '',
+      closed: (v && v.pubClosed) || '',
+      responses: (v && v.pubResponses) || ''
+    };
+  }
+
   function getMeta(vacMeta, vac) {
     return vacMeta[vac] || { hhLink: '', siteUrl: '', customerId: '', status: 'В работе', openedDate: '', closedDate: '', planHires: '' };
   }
@@ -197,6 +214,20 @@ const ANALYTICS = (function () {
     const confirmed = pool.filter(c => c.status === CONFIRMED_STATUS).length;
     const pct = started ? Math.round((confirmed / started) * 100) : null;
     return { started, confirmed, pct };
+  }
+
+  // ── Размещение публикации и ROI ──
+  function reportPublication(candidates, vacancies, hrVacancies) {
+    return vacancies.map(v => {
+      const pub = getPubInfo(hrVacancies, v);
+      const cands = candidates.filter(c => c.vacancy === v);
+      const hires = cands.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
+      const cost = parseFloat(String(pub.cost).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      const responses = parseInt(pub.responses) || 0;
+      const costPerHire = (cost && hires) ? Math.round(cost / hires) : null;
+      const responseToHire = (responses && hires) ? Math.round((hires / responses) * 100) : null;
+      return { vacancy: v, source: pub.source, cost: pub.cost, opened: pub.opened, closed: pub.closed, responses: pub.responses, hires, costPerHire, responseToHire };
+    }).filter(r => r.source || r.cost || r.responses);
   }
 
   function bar(label, count, pct, colorClass) {
@@ -367,6 +398,21 @@ const ANALYTICS = (function () {
       '<div class="an-stat"><div class="an-stat-n">' + (retention.pct != null ? retention.pct + '%' : '—') + '</div><div class="an-stat-l">Retention</div></div>' +
       '</div>';
     if (!retention.started) html += '<div class="an-empty" style="padding:10px 0;">Нет вышедших на работу в выборке</div>';
+    html += '</div>';
+
+    // 7. Размещение публикации и ROI
+    const hrVacancies = loadHrVacancies();
+    const pubReport = reportPublication(candidates, scopedVacanciesFinal, hrVacancies);
+    html += '<div class="an-section-title">📢 Размещение публикации и ROI</div><div class="an-card" style="overflow-x:auto;">';
+    if (pubReport.length) {
+      html += '<table class="an-table"><thead><tr><th>Вакансия</th><th>Источник</th><th>Стоимость</th><th>Открыта</th><th>Закрыта</th><th>Откликов</th><th>Выходов</th><th>Стоимость за выход</th><th>% откликов → выход</th></tr></thead><tbody>';
+      pubReport.forEach(r => {
+        html += '<tr><td>' + escHtml(r.vacancy) + '</td><td>' + escHtml(r.source || '—') + '</td><td>' + escHtml(r.cost || '—') + '</td><td>' + (r.opened ? fmtDate(r.opened) : '—') + '</td><td>' + (r.closed ? fmtDate(r.closed) : '—') + '</td><td>' + (r.responses || '—') + '</td><td>' + r.hires + '</td><td>' + (r.costPerHire != null ? r.costPerHire : '—') + '</td><td>' + (r.responseToHire != null ? r.responseToHire + '%' : '—') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<div class="an-empty" style="padding:10px 0;">Заполни источник/стоимость/отклики в HR-ассистенте — карточка вакансии → «Изменить»</div>';
+    }
     html += '</div>';
 
     root.innerHTML = html;
