@@ -207,6 +207,32 @@ const ANALYTICS = (function () {
       '</div>';
   }
 
+  // Выпадающие списки день/месяц/год вместо <input type="date"> — у некоторых
+  // браузеров ручной ввод года в нативном date-picker'е "застревает" (вводится
+  // как 0020 вместо 2020). Со списками такой баг невозможен.
+  const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  function buildDatePicker(idPrefix, value) {
+    const d = parseDate(value) || new Date();
+    const curYear = new Date().getFullYear();
+    const years = [];
+    for (let y = curYear - 5; y <= curYear + 1; y++) years.push(y);
+    const dayOpts = Array.from({ length: 31 }, (_, i) => i + 1)
+      .map(n => `<option value="${n}"${d.getDate() === n ? ' selected' : ''}>${n}</option>`).join('');
+    const monthOpts = MONTH_NAMES.map((name, i) => `<option value="${i}"${d.getMonth() === i ? ' selected' : ''}>${name}</option>`).join('');
+    const yearOpts = years.map(y => `<option value="${y}"${d.getFullYear() === y ? ' selected' : ''}>${y}</option>`).join('');
+    return `<select id="${idPrefix}-d" class="an-filter-input an-date-part">${dayOpts}</select>` +
+      `<select id="${idPrefix}-m" class="an-filter-input an-date-part">${monthOpts}</select>` +
+      `<select id="${idPrefix}-y" class="an-filter-input an-date-part">${yearOpts}</select>`;
+  }
+  function readDatePicker(idPrefix) {
+    const dEl = document.getElementById(idPrefix + '-d');
+    const mEl = document.getElementById(idPrefix + '-m');
+    const yEl = document.getElementById(idPrefix + '-y');
+    if (!dEl || !mEl || !yEl) return '';
+    const y = yEl.value, m = String(parseInt(mEl.value) + 1).padStart(2, '0'), day = String(dEl.value).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   function renderFilters(vacancies, vacMeta, customers) {
     const custOpts = '<option value="">Все заказчики</option>' +
       customers.map(c => `<option value="${c.id}"${filters.customerId === c.id ? ' selected' : ''}>${escHtml(c.name)}</option>`).join('');
@@ -218,7 +244,8 @@ const ANALYTICS = (function () {
     ];
     const periodOpts = periods.map(([v, l]) => `<option value="${v}"${filters.period === v ? ' selected' : ''}>${l}</option>`).join('');
     const customRange = filters.period === 'custom'
-      ? `<input type="date" id="an-from" value="${filters.from}" class="an-filter-input"><input type="date" id="an-to" value="${filters.to}" class="an-filter-input">`
+      ? '<span class="an-date-label">с</span>' + buildDatePicker('an-from', filters.from) +
+        '<span class="an-date-label">по</span>' + buildDatePicker('an-to', filters.to)
       : '';
     return '<div class="an-filters">' +
       '<select id="an-customer" class="an-filter-input">' + custOpts + '</select>' +
@@ -234,11 +261,17 @@ const ANALYTICS = (function () {
     const pEl = document.getElementById('an-period');
     if (cEl) cEl.onchange = () => { filters.customerId = cEl.value; filters.vacancy = ''; render(); };
     if (vEl) vEl.onchange = () => { filters.vacancy = vEl.value; render(); };
-    if (pEl) pEl.onchange = () => { filters.period = pEl.value; render(); };
-    const fromEl = document.getElementById('an-from');
-    const toEl = document.getElementById('an-to');
-    if (fromEl) fromEl.onchange = () => { filters.from = fromEl.value; render(); };
-    if (toEl) toEl.onchange = () => { filters.to = toEl.value; render(); };
+    if (pEl) pEl.onchange = () => { filters.period = pEl.value; if (pEl.value === 'custom' && !filters.from) { filters.from = todayStr(); filters.to = todayStr(); } render(); };
+    ['an-from', 'an-to'].forEach(idPrefix => {
+      ['-d', '-m', '-y'].forEach(suffix => {
+        const el = document.getElementById(idPrefix + suffix);
+        if (el) el.onchange = () => {
+          filters.from = readDatePicker('an-from');
+          filters.to = readDatePicker('an-to');
+          render();
+        };
+      });
+    });
   }
 
   function render() {

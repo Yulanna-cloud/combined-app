@@ -1,8 +1,10 @@
 #view-analytics { background: #eef2f7; padding: 20px; font-family: Arial, sans-serif; color: #111; }
 #view-analytics .an-empty { text-align: center; padding: 60px 20px; color: #888; font-size: 14px; }
 
-#view-analytics .an-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px 14px; }
+#view-analytics .an-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px 14px; }
 #view-analytics .an-filter-input { font-size: 13px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; color: #222; min-width: 160px; }
+#view-analytics .an-date-part { min-width: auto; }
+#view-analytics .an-date-label { font-size: 12px; color: #888; }
 
 #view-analytics .an-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
 #view-analytics .an-stat { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; text-align: center; }
