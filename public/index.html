@@ -347,6 +347,7 @@
       <div class="settings-menu" id="settingsMenu">
         <div class="settings-menu-item" onclick="CRM.openVacancySettings();CRM.closeSettingsMenu()">🏢 Управление вакансиями</div>
         <div class="settings-menu-item" onclick="CRM.openCustomersSettings();CRM.closeSettingsMenu()">🏛 Заказчики</div>
+        <div class="settings-menu-item" onclick="CRM.openTagsSettings();CRM.closeSettingsMenu()">🏷 Теги</div>
         <div class="settings-menu-item" onclick="CRM.openManagersSettings();CRM.closeSettingsMenu()">👤 Руководители</div>
         <div class="settings-menu-item" onclick="CRM.openSlotsManager();CRM.closeSettingsMenu()">📅 Мои слоты</div>
         <div class="settings-menu-item" onclick="CRM.openCloseVacancy();CRM.closeSettingsMenu()">🔒 Закрыть вакансию</div>
@@ -366,10 +367,35 @@
   <div class="tab active" onclick="CRM.switchTab('c',this)">Кандидаты</div>
   <div class="tab" onclick="CRM.switchTab('h',this)">История событий</div>
   <div class="tab" onclick="CRM.switchTab('a',this)">🗄 Архив</div>
+  <div class="tab" onclick="CRM.switchTab('p',this)">🌟 Кадровый резерв</div>
 </div>
 <div id="tc"><div class="tbl-wrap"><table><thead><tr id="thead-row"></tr></thead><tbody id="tb"></tbody></table></div></div>
 <div id="th" style="display:none"><div class="tbl-wrap"><div id="hb"></div></div></div>
 <div id="ta" style="display:none"><div class="tbl-wrap"><table><thead><tr id="athead-row"></tr></thead><tbody id="atb"></tbody></table></div></div>
+<div id="tp" style="display:none">
+  <div class="filters" style="margin-bottom:10px;">
+    <input type="text" id="poolSearch" placeholder="🔍 Поиск по имени..." style="width:180px" oninput="CRM.renderTalentPool()">
+    <div class="dd-wrap">
+      <button class="btn" onclick="CRM.toggleDD('poolRatingDD')" id="poolRatingBtnLabel" style="min-width:120px;text-align:left">Все рейтинги ▾</button>
+      <div id="poolRatingDD" class="dd-menu">
+        <label><input type="checkbox" value="A" onchange="CRM.renderTalentPool()"> A</label>
+        <label><input type="checkbox" value="B" onchange="CRM.renderTalentPool()"> B</label>
+        <label><input type="checkbox" value="C" onchange="CRM.renderTalentPool()"> C</label>
+        <label><input type="checkbox" value="D" onchange="CRM.renderTalentPool()"> D</label>
+      </div>
+    </div>
+    <div class="dd-wrap">
+      <button class="btn" onclick="CRM.toggleDD('poolTagsDD')" id="poolTagsBtnLabel" style="min-width:120px;text-align:left">Все теги ▾</button>
+      <div id="poolTagsDD" class="dd-menu"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" id="poolFinalistOnly" onchange="CRM.renderTalentPool()"> Только финалисты
+    </label>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr>
+    <th>ФИО</th><th>В резерве</th><th>Рейтинг</th><th>Финалист</th><th>Теги</th><th>Последняя вакансия</th><th>Заметка</th><th></th>
+  </tr></thead><tbody id="poolBody"></tbody></table></div>
+</div>
 </div>
 <div id="mdl" style="display:none"></div>
 <div id="funnelListPopup" style="position:fixed;bottom:20px;right:20px;width:640px;max-width:96vw;z-index:300;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);"></div>

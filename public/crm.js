@@ -7,10 +7,10 @@ function toggleSettingsMenu(){
 function closeSettingsMenu(){
   document.getElementById('settingsMenu').style.display='none';
 }
+const ALL_DD_IDS=['stageDD','statusDD','poolRatingDD','poolTagsDD'];
 document.addEventListener('click',function(e){
-  if(!e.target.closest('.dd-wrap')&&!e.target.closest('#stageDD')&&!e.target.closest('#statusDD')){
-    document.getElementById('stageDD').style.display='none';
-    document.getElementById('statusDD').style.display='none';
+  if(!e.target.closest('.dd-wrap')){
+    ALL_DD_IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   }
   if(!e.target.closest('[onclick*="toggleSettingsMenu"]')&&!e.target.closest('#settingsMenu')){
     const m=document.getElementById('settingsMenu');if(m)m.style.display='none';
@@ -47,6 +47,18 @@ function addCustomer(name){
 }
 function getCustomerName(id){const c=CUSTOMERS.find(x=>x.id===id);return c?c.name:'';}
 const VACANCY_STATUSES=['В работе','На паузе','Закрыта','Отменена'];
+
+// ── Кадровый резерв (Talent Pool) ─────────────────────────────────
+const TALENT_POOL_LABELS={none:'Нет',reserve:'Резерв',hot_reserve:'Горячий резерв'};
+const RATING_LABELS={A:'A — обязательно вернуть',B:'B — хороший кандидат',C:'C — средний',D:'D — не рассматривать'};
+let TAGS=JSON.parse(localStorage.getItem('crm_tags')||'null')||['РОП','Инженер ПТО','Сметчик','Удаленка','Релокация','Казань'];
+function saveTags(){localStorage.setItem('crm_tags',JSON.stringify(TAGS));}
+function addTag(name){
+  const n=(name||'').trim();
+  if(!n||TAGS.includes(n))return;
+  TAGS.push(n);saveTags();
+}
+function removeTag(i){TAGS.splice(i,1);saveTags();}
 
 function openCustomersSettings(){
   var rows=CUSTOMERS.length?CUSTOMERS.map(function(c,i){
@@ -87,6 +99,40 @@ function saveCustomerEdits(){
   });
   saveCustomers();
 }
+
+function openTagsSettings(){
+  var rows=TAGS.length?TAGS.map(function(t,i){
+    var count=D.candidates.filter(function(c){return (c.tags||[]).includes(t);}).length;
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'+
+      '<span style="flex:1;font-size:13px;">'+t+'</span>'+
+      '<span style="font-size:11px;color:#888;white-space:nowrap;">кандидатов: '+count+'</span>'+
+      '<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;flex-shrink:0;" onclick="CRM.removeTagUI('+i+')">✕</button>'+
+      '</div>';
+  }).join(''):'<p style="color:#aaa;font-size:13px;margin-bottom:10px;">Нет тегов.</p>';
+  modal('<h2>🏷 Теги кандидатов</h2>'+
+    '<p style="font-size:12px;color:#666;margin-bottom:14px">Теги помогают находить подходящих кандидатов из резерва для новых вакансий.</p>'+
+    '<div id="tagsList">'+rows+'</div>'+
+    '<div style="display:flex;gap:6px;margin-top:8px;margin-bottom:16px;">'+
+    '<input id="newTagName" type="text" placeholder="Новый тег" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">'+
+    '<button class="btn btn-primary" onclick="CRM.addTagUI()" style="flex-shrink:0;">+ Добавить</button>'+
+    '</div>'+
+    '<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+}
+function addTagUI(){
+  var name=document.getElementById('newTagName').value.trim();
+  if(!name){alert('Введи название тега');return;}
+  addTag(name);
+  document.getElementById('newTagName').value='';
+  openTagsSettings();
+}
+function removeTagUI(i){
+  var t=TAGS[i];if(!t)return;
+  var count=D.candidates.filter(function(c){return (c.tags||[]).includes(t);}).length;
+  if(count>0&&!confirm('Тег «'+t+'» используется у '+count+' кандидатов — он будет снят у них. Удалить тег?'))return;
+  D.candidates.forEach(function(c){if(c.tags)c.tags=c.tags.filter(function(x){return x!==t;});});
+  removeTag(i);saveData();openTagsSettings();
+}
+
 function getVacStyle(v){
   const c=VAC_COLORS[v];
   if(!c)return null;
@@ -314,6 +360,28 @@ function parseDate(s){if(!s)return null;const p=s.split('-');if(p.length!==3)ret
 function isSameDay(ds){const d=parseDate(ds);if(!d)return false;const t=new Date();return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate();}
 function nextId(){if(!D.candidates.length)return 'K-001';const nums=D.candidates.map(c=>parseInt(c.id.replace(/\D/g,''))||0);return 'K-'+String(Math.max(...nums)+1).padStart(3,'0');}
 function sel(opts,val){return opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');}
+
+// ── Поля кадрового резерва для форм добавления/редактирования кандидата ──
+function talentPoolFieldsHtml(c){
+  c=c||{};
+  const tp=c.talentPool||'none';
+  const rating=c.rating||'';
+  const finalist=!!c.finalist;
+  const tags=c.tags||[];
+  const tpOpts=Object.keys(TALENT_POOL_LABELS).map(k=>`<option value="${k}"${tp===k?' selected':''}>${TALENT_POOL_LABELS[k]}</option>`).join('');
+  const ratingOpts='<option value="">— не оценён —</option>'+Object.keys(RATING_LABELS).map(k=>`<option value="${k}"${rating===k?' selected':''}>${RATING_LABELS[k]}</option>`).join('');
+  const tagBoxes=TAGS.map(t=>`<label style="display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0;font-size:12px;font-weight:400;text-transform:none;"><input type="checkbox" class="tag-checkbox" value="${t}"${tags.includes(t)?' checked':''}> ${t}</label>`).join('');
+  return `
+<hr class="divider">
+<div class="section-title">Кадровый резерв</div>
+<div class="f2">
+<div class="fr"><label>В резерве</label><select id="ftp">${tpOpts}</select></div>
+<div class="fr"><label>Рейтинг</label><select id="frating">${ratingOpts}</select></div>
+</div>
+<div class="fr"><label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;font-weight:600;color:#333;"><input type="checkbox" id="ffinalist"${finalist?' checked':''} style="width:auto;"> 🏁 Финалист (дошёл до финала, но проиграл другому кандидату)</label></div>
+<div class="fr"><label>Теги</label><div style="display:flex;flex-wrap:wrap;">${tagBoxes||'<span style="font-size:12px;color:#aaa;">Нет тегов — добавь в Настройки → Теги</span>'}</div></div>
+<div class="fr"><label>Заметки на будущее</label><textarea id="ffuture" placeholder="На что обратить внимание при следующем подборе...">${c.futureOpportunityNote||''}</textarea></div>`;
+}
 function selStage(val){const opts=[...STAGES];if(val&&!opts.includes(val))opts.push(val);return opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');}
 function toggleRefuse(s,divId){const d=document.getElementById(divId);if(d)d.style.display=REFUSE_STATUSES.includes(s.value)?'block':'none';}
 function sbadge(s){
@@ -330,7 +398,7 @@ function applyStageFilter(){const c=getChecked('stageDD');document.getElementByI
 function applyStatusFilter(){const c=getChecked('statusDD');document.getElementById('statusBtnLabel').textContent=c.length?c.join(', ')+' ▾':'Все статусы ▾';renderTable();}
 function clearStageFilter(){document.querySelectorAll('#stageDD input').forEach(x=>x.checked=false);document.getElementById('stageBtnLabel').textContent='Все этапы ▾';document.getElementById('stageDD').style.display='none';renderTable();}
 function clearStatusFilter(){document.querySelectorAll('#statusDD input').forEach(x=>x.checked=false);document.getElementById('statusBtnLabel').textContent='Все статусы ▾';document.getElementById('statusDD').style.display='none';renderTable();}
-function toggleDD(id){['stageDD','statusDD'].filter(x=>x!==id).forEach(x=>document.getElementById(x).style.display='none');const dd=document.getElementById(id);dd.style.display=dd.style.display==='none'?'block':'none';}
+function toggleDD(id){ALL_DD_IDS.filter(x=>x!==id).forEach(x=>{var el=document.getElementById(x);if(el)el.style.display='none';});const dd=document.getElementById(id);dd.style.display=dd.style.display==='none'?'block':'none';}
 function setToday(){document.getElementById('fDate').value=todayStr();renderTable();}
 function clearDate(){document.getElementById('fDate').value='';renderTable();}
 function renderStats(){
@@ -394,8 +462,41 @@ function renderArchive(){
   if(!archived.length){atb.innerHTML=`<tr><td colspan="8" class="empty">Архив пуст</td></tr>`;return;}
   atb.innerHTML=archived.map(c=>`<tr class="row-done"><td>${c.id}</td><td><b>${c.name}</b></td><td>${c.vacancy}</td><td>${c.stage}</td><td>${sbadge(c.status)}</td><td>${c.refuseReason?`<span class="badge br">${c.refuseReason}</span>`:''}</td><td>${c.added||''}</td><td><button class="btn btn-sm" onclick="CRM.unarchiveCandidate('${c.id}')" title="Вернуть">↩️</button></td></tr>`).join('');
 }
+// ── Кадровый резерв ────────────────────────────────────────────────
+function renderTalentPool(){
+  const body=document.getElementById('poolBody');if(!body)return;
+  const tagsDD=document.getElementById('poolTagsDD');
+  if(tagsDD&&!tagsDD.dataset.built){
+    tagsDD.innerHTML=TAGS.map(t=>`<label><input type="checkbox" value="${t}" onchange="CRM.renderTalentPool()"> ${t}</label>`).join('')
+      +'<div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearPoolTagsFilter()">Сбросить</button></div>';
+    tagsDD.dataset.built='1';
+  }
+  const search=(document.getElementById('poolSearch')?.value||'').trim().toLowerCase();
+  const ratings=[...document.querySelectorAll('#poolRatingDD input:checked')].map(x=>x.value);
+  const tags=[...document.querySelectorAll('#poolTagsDD input:checked')].map(x=>x.value);
+  const finalistOnly=document.getElementById('poolFinalistOnly')?.checked;
+  document.getElementById('poolRatingBtnLabel').textContent=ratings.length?ratings.join(', ')+' ▾':'Все рейтинги ▾';
+  document.getElementById('poolTagsBtnLabel').textContent=tags.length?tags.join(', ')+' ▾':'Все теги ▾';
+
+  let pool=D.candidates.filter(c=>['reserve','hot_reserve'].includes(c.talentPool));
+  if(search)pool=pool.filter(c=>c.name.toLowerCase().includes(search));
+  if(ratings.length)pool=pool.filter(c=>ratings.includes(c.rating));
+  if(tags.length)pool=pool.filter(c=>(c.tags||[]).some(t=>tags.includes(t)));
+  if(finalistOnly)pool=pool.filter(c=>c.finalist);
+
+  if(!pool.length){body.innerHTML='<tr><td colspan="8" class="empty">Никого не найдено</td></tr>';return;}
+  body.innerHTML=pool.map(c=>{
+    const tpBadge=c.talentPool==='hot_reserve'?'<span class="badge br">🔥 Горячий резерв</span>':'<span class="badge bw">Резерв</span>';
+    const ratingBadge=c.rating?`<span class="badge ${c.rating==='A'?'bout':c.rating==='B'?'bw':c.rating==='D'?'br':'bdef'}">${c.rating}</span>`:'—';
+    const tagBadges=(c.tags||[]).map(t=>`<span class="badge bpurple">${t}</span>`).join(' ')||'—';
+    const note=(c.futureOpportunityNote||'').slice(0,60)+((c.futureOpportunityNote||'').length>60?'…':'');
+    return `<tr><td><b>${c.name}</b></td><td>${tpBadge}</td><td>${ratingBadge}</td><td>${c.finalist?'🏁':''}</td><td>${tagBadges}</td><td>${c.vacancy||''}</td><td style="max-width:220px;font-size:12px;color:#666;">${note}</td><td><button class="btn btn-sm" onclick="CRM.openEdit('${c.id}')">✏️</button></td></tr>`;
+  }).join('');
+}
+function clearPoolTagsFilter(){document.querySelectorAll('#poolTagsDD input').forEach(x=>x.checked=false);renderTalentPool();}
+
 function render(){renderStats();renderTable();renderHistory();renderArchive();}
-function switchTab(t,el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById('tc').style.display=t==='c'?'block':'none';document.getElementById('th').style.display=t==='h'?'block':'none';document.getElementById('ta').style.display=t==='a'?'block':'none';}
+function switchTab(t,el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById('tc').style.display=t==='c'?'block':'none';document.getElementById('th').style.display=t==='h'?'block':'none';document.getElementById('ta').style.display=t==='a'?'block':'none';document.getElementById('tp').style.display=t==='p'?'block':'none';if(t==='p')renderTalentPool();}
 document.getElementById('srch').addEventListener('input',renderTable);
 document.getElementById('fV').addEventListener('input',renderTable);
 function closeModal(){document.getElementById('mdl').style.display='none';}
@@ -716,11 +817,13 @@ function openCloseVacancy(){
 function closeVacancy(){
   var vac=document.getElementById('closeVacSel')&&document.getElementById('closeVacSel').value;if(!vac)return;
   var active=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===vac;});
-  if(!confirm('Закрыть «'+vac+'»?'+(active.length?' '+active.length+' активных кандидатов будут заархивированы.':'')))return;
-  active.forEach(function(c){c.status='Не вышел на работу';c.archived=true;});
+  // Кандидаты НЕ архивируются при закрытии вакансии — они остаются в общей базе
+  // и доступны для кадрового резерва на будущие вакансии.
+  if(!confirm('Закрыть «'+vac+'»?'+(active.length?' '+active.length+' активных кандидатов получат статус «Не вышел на работу», но останутся в базе.':'')))return;
+  active.forEach(function(c){c.status='Не вышел на работу';});
   setVacMeta(vac,'status','Закрыта');
   setVacMeta(vac,'closedDate',todayStr());
-  D.history.push({date:todayStr(),cid:'',name:'Вакансия: '+vac,vacancy:vac,event:'Вакансия закрыта',desc:'Закрыто '+active.length+' кандидатов',result:'',resp:'Я'});
+  D.history.push({date:todayStr(),cid:'',name:'Вакансия: '+vac,vacancy:vac,event:'Вакансия закрыта',desc:'Закрыто, кандидатов в работе: '+active.length,result:'',resp:'Я'});
   saveData();closeModal();render();
 }
 
@@ -880,11 +983,21 @@ function openAdd(){
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
+${talentPoolFieldsHtml(null)}
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>`);
+}
+function readTalentPoolFields(){
+  return {
+    talentPool: document.getElementById('ftp')?.value||'none',
+    rating: document.getElementById('frating')?.value||'',
+    finalist: document.getElementById('ffinalist')?.checked||false,
+    tags: Array.from(document.querySelectorAll('.tag-checkbox:checked')).map(el=>el.value),
+    futureOpportunityNote: document.getElementById('ffuture')?.value||''
+  };
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||''});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -908,6 +1021,7 @@ function openEdit(id){
 <div class="fr"><label>Комментарий</label><textarea id="fco">${c.comment||''}</textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" value="${c.resumeLink||''}"></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" value="${c.hhLink||''}"></div>
+${talentPoolFieldsHtml(c)}
 <div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:14px;border-top:1px solid #eee;">
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
 <button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
@@ -921,6 +1035,13 @@ function openEdit(id){
 <button class="btn btn-primary" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
 </div>
 </div>
+${(()=>{
+  // Тот же человек мог подаваться на другие вакансии в прошлом — показываем как историю участия.
+  const other=D.candidates.filter(x=>x.id!==c.id&&x.name.trim().toLowerCase()===c.name.trim().toLowerCase());
+  if(!other.length) return '';
+  const rows=other.map(x=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;font-size:12px;">'+(x.vacancy||'—')+'</td><td style="padding:6px 10px;font-size:12px;">'+(x.stage||'')+'</td><td style="padding:6px 10px;font-size:12px;">'+sbadge(x.status)+'</td><td style="padding:6px 10px;font-size:12px;color:#666;white-space:nowrap;">'+(x.added||'')+'</td></tr>').join('');
+  return '<hr style="margin:16px 0;border-color:#eee;"><div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">🔁 Участие в других вакансиях</div><div style="max-height:160px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+rows+'</tbody></table></div>';
+})()}
 ${(()=>{
   const hist=D.history.filter(h=>h.cid===c.id).slice(0,15);
   if(!hist.length) return '';
@@ -945,6 +1066,7 @@ function saveEdit(id){
   c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.resumeLink=document.getElementById('frl')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.hhLink=document.getElementById('fhh')?.value||'';
   if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;
   if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';
+  if(document.getElementById('ftp'))Object.assign(c,readTalentPoolFields());
   // Автоматически записываем событие если изменился этап или статус
   const newStage=c.stage||'';
   const newStatus=c.status||'';
@@ -1072,6 +1194,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
 <div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
 <div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
+${talentPoolFieldsHtml(null)}
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>
 </div>`;
 }
@@ -1101,12 +1224,17 @@ return {
   addCustomerUI,
   addManager,
   addSlot,
+  clearPoolTagsFilter,
+  renderTalentPool,
+  addTagUI,
   addVacancy,
   applyStageFilter,
   deleteCustomer,
   emailInvite,
   openCustomersSettings,
+  openTagsSettings,
   parsePDF,
+  removeTagUI,
   saveCustomerEdits,
   applyStatusFilter,
   archiveAllInactive,
