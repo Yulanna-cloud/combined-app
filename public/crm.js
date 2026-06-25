@@ -492,18 +492,23 @@ function renderTalentPool(){
   const ratings=[...document.querySelectorAll('#poolRatingDD input:checked')].map(x=>x.value);
   const tags=[...document.querySelectorAll('#poolTagsDD input:checked')].map(x=>x.value);
   const finalistOnly=document.getElementById('poolFinalistOnly')?.checked;
+  const reserveOnly=document.getElementById('poolReserveOnly')?.checked;
   document.getElementById('poolRatingBtnLabel').textContent=ratings.length?ratings.join(', ')+' ▾':'Все рейтинги ▾';
   document.getElementById('poolTagsBtnLabel').textContent=tags.length?tags.join(', ')+' ▾':'Все теги ▾';
 
-  let pool=D.candidates.filter(c=>['reserve','hot_reserve'].includes(c.talentPool));
+  // Показываем не только тех, у кого явно включён резерв, но и любого с
+  // выставленным рейтингом/тегами/флагом финалиста — иначе кандидат с
+  // рейтингом "A" без отдельно включённого резерва никогда бы не нашёлся.
+  let pool=D.candidates.filter(c=>['reserve','hot_reserve'].includes(c.talentPool)||c.rating||c.finalist||(c.tags&&c.tags.length));
   if(search)pool=pool.filter(c=>c.name.toLowerCase().includes(search));
   if(ratings.length)pool=pool.filter(c=>ratings.includes(c.rating));
   if(tags.length)pool=pool.filter(c=>(c.tags||[]).some(t=>tags.includes(t)));
   if(finalistOnly)pool=pool.filter(c=>c.finalist);
+  if(reserveOnly)pool=pool.filter(c=>['reserve','hot_reserve'].includes(c.talentPool));
 
   if(!pool.length){body.innerHTML='<tr><td colspan="8" class="empty">Никого не найдено</td></tr>';return;}
   body.innerHTML=pool.map(c=>{
-    const tpBadge=c.talentPool==='hot_reserve'?'<span class="badge br">🔥 Горячий резерв</span>':'<span class="badge bw">Резерв</span>';
+    const tpBadge=c.talentPool==='hot_reserve'?'<span class="badge br">🔥 Горячий резерв</span>':c.talentPool==='reserve'?'<span class="badge bw">Резерв</span>':'<span class="badge bdef">Не в резерве</span>';
     const ratingBadge=c.rating?`<span class="badge ${c.rating==='A'?'bout':c.rating==='B'?'bw':c.rating==='D'?'br':'bdef'}">${c.rating}</span>`:'—';
     const tagBadges=(c.tags||[]).map(t=>`<span class="badge bpurple">${t}</span>`).join(' ')||'—';
     const note=(c.futureOpportunityNote||'').slice(0,60)+((c.futureOpportunityNote||'').length>60?'…':'');
