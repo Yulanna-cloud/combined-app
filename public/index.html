@@ -311,33 +311,17 @@
     <input type="date" id="fDate" onchange="CRM.renderTable()" style="height:32px;font-size:13px;border:1px solid #ccc;border-radius:6px;padding:0 8px;background:#fff">
     <button class="btn" onclick="CRM.setToday()" style="background:#fff8e1;border-color:#f9a825;color:#f57f17;font-weight:600;white-space:nowrap">📅 Сегодня</button>
     <button class="btn" onclick="CRM.clearDate()" style="font-size:12px">✕ Дата</button>
+    <select id="fCust" onchange="CRM.onCustFilterChange()"><option value="">Все заказчики</option></select>
     <select id="fV"><option value="">Все вакансии</option></select>
     <div class="dd-wrap">
       <button class="btn" onclick="CRM.toggleDD('stageDD')" id="stageBtnLabel" style="min-width:120px;text-align:left">Все этапы ▾</button>
       <div id="stageDD" class="dd-menu">
-        <label><input type="checkbox" value="Отклик" onchange="CRM.applyStageFilter()"> Отклик</label>
-        <label><input type="checkbox" value="Интервью HR — назначено" onchange="CRM.applyStageFilter()"> Интервью HR — назначено</label>
-        <label><input type="checkbox" value="Интервью HR — проведено" onchange="CRM.applyStageFilter()"> Интервью HR — проведено</label>
-        <label><input type="checkbox" value="Интервью с РОП — назначено" onchange="CRM.applyStageFilter()"> Интервью с РОП — назначено</label>
-        <label><input type="checkbox" value="Интервью с РОП — проведено" onchange="CRM.applyStageFilter()"> Интервью с РОП — проведено</label>
-        <label><input type="checkbox" value="Оффер" onchange="CRM.applyStageFilter()"> Оффер</label>
-        <label><input type="checkbox" value="Обучение" onchange="CRM.applyStageFilter()"> Обучение</label>
-        <label><input type="checkbox" value="Работает" onchange="CRM.applyStageFilter()"> Работает</label>
         <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStageFilter()">Сбросить</button></div>
       </div>
     </div>
     <div class="dd-wrap">
       <button class="btn" onclick="CRM.toggleDD('statusDD')" id="statusBtnLabel" style="min-width:120px;text-align:left">Все статусы ▾</button>
       <div id="statusDD" class="dd-menu">
-        <label><input type="checkbox" value="В работе" onchange="CRM.applyStatusFilter()"> В работе</label>
-        <label><input type="checkbox" value="Перенос собеседования" onchange="CRM.applyStatusFilter()"> Перенос собеседования</label>
-        <label><input type="checkbox" value="Недозвон" onchange="CRM.applyStatusFilter()"> Недозвон</label>
-        <label><input type="checkbox" value="Перезвон" onchange="CRM.applyStatusFilter()"> Перезвон</label>
-        <label><input type="checkbox" value="Отказался сам (кандидат)" onchange="CRM.applyStatusFilter()"> Отказался сам (кандидат)</label>
-        <label><input type="checkbox" value="Отказ" onchange="CRM.applyStatusFilter()"> Отказ</label>
-        <label><input type="checkbox" value="Оффер" onchange="CRM.applyStatusFilter()"> Оффер</label>
-        <label><input type="checkbox" value="Вышел" onchange="CRM.applyStatusFilter()"> Вышел</label>
-        <label><input type="checkbox" value="Не вышел на собеседование" onchange="CRM.applyStatusFilter()"> Не вышел на собеседование</label>
         <div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStatusFilter()">Сбросить</button></div>
       </div>
     </div>

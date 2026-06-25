@@ -84,20 +84,21 @@ function addCustomerUI(){
   if(!name){alert('Введи название заказчика');return;}
   addCustomer(name);
   document.getElementById('newCustName').value='';
-  openCustomersSettings();
+  openCustomersSettings();updateFCustSelect();
 }
 function deleteCustomer(i){
   var c=CUSTOMERS[i];if(!c)return;
   var vacCount=VACANCIES.filter(function(v){return getVacMeta(v).customerId===c.id;}).length;
   if(vacCount>0&&!confirm('У этого заказчика '+vacCount+' вакансий — они останутся без заказчика. Удалить?'))return;
-  CUSTOMERS.splice(i,1);saveCustomers();openCustomersSettings();renderVacList();
+  VACANCIES.forEach(function(v){if(getVacMeta(v).customerId===c.id)setVacMeta(v,'customerId','');});
+  CUSTOMERS.splice(i,1);saveCustomers();openCustomersSettings();renderVacList();updateFCustSelect();
 }
 function saveCustomerEdits(){
   document.querySelectorAll('.cust-name').forEach(function(el){
     var i=parseInt(el.getAttribute('data-i'));
     if(CUSTOMERS[i])CUSTOMERS[i].name=el.value.trim();
   });
-  saveCustomers();
+  saveCustomers();updateFCustSelect();
 }
 
 function openTagsSettings(){
@@ -147,7 +148,33 @@ function vacBadge(v){
 function updateFVSelect(){
   const fv=document.getElementById('fV');if(!fv)return;
   const cur=fv.value;
-  fv.innerHTML=`<option value="">Все вакансии</option>`+VACANCIES.map(v=>`<option${v===cur?' selected':''}>${v}</option>`).join('');
+  const custId=document.getElementById('fCust')?.value||'';
+  const scoped=custId?VACANCIES.filter(v=>getVacMeta(v).customerId===custId):VACANCIES;
+  fv.innerHTML=`<option value="">Все вакансии</option>`+scoped.map(v=>`<option${v===cur?' selected':''}>${v}</option>`).join('');
+  if(custId&&!scoped.includes(cur))fv.value='';
+}
+function updateFCustSelect(){
+  const fc=document.getElementById('fCust');if(!fc)return;
+  const cur=fc.value;
+  fc.innerHTML=`<option value="">Все заказчики</option>`+CUSTOMERS.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${c.name}</option>`).join('');
+}
+function onCustFilterChange(){
+  updateFVSelect();
+  renderTable();
+}
+function renderFilterDropdowns(){
+  const stageDD=document.getElementById('stageDD');
+  if(stageDD){
+    const checked=getChecked('stageDD');
+    stageDD.innerHTML=STAGES.map(s=>`<label><input type="checkbox" value="${s}"${checked.includes(s)?' checked':''} onchange="CRM.applyStageFilter()"> ${s}</label>`).join('')
+      +'<div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStageFilter()">Сбросить</button></div>';
+  }
+  const statusDD=document.getElementById('statusDD');
+  if(statusDD){
+    const checked=getChecked('statusDD');
+    statusDD.innerHTML=STATUSES.map(s=>`<label><input type="checkbox" value="${s}"${checked.includes(s)?' checked':''} onchange="CRM.applyStatusFilter()"> ${s}</label>`).join('')
+      +'<div style="border-top:1px solid #eee;padding:4px 14px;margin-top:2px"><button class="btn btn-sm" onclick="CRM.clearStatusFilter()">Сбросить</button></div>';
+  }
 }
 function openVacancySettings(){
   modal(`<h2>🏢 Управление вакансиями</h2>
@@ -402,6 +429,7 @@ function renderTable(){
   const tb=document.getElementById('tb');renderHeaders();
   const q=(document.getElementById('srch').value||'').toLowerCase();
   const fv=document.getElementById('fV').value;
+  const fCust=document.getElementById('fCust')?.value||'';
   const stages=getChecked('stageDD');const statuses=getChecked('statusDD');
   const activeOnly=document.getElementById('activeOnly').checked;
   const fDate=document.getElementById('fDate').value;
@@ -409,6 +437,7 @@ function renderTable(){
     if(c.archived)return false;
     if(q&&!c.name.toLowerCase().includes(q))return false;
     if(fv&&c.vacancy!==fv)return false;
+    if(fCust&&getVacMeta(c.vacancy).customerId!==fCust)return false;
     if(stages.length&&!stages.includes(c.stage))return false;
     if(statuses.length&&!statuses.includes(c.status))return false;
     if(activeOnly&&!statuses.length&&INACTIVE.includes(c.status))return false;
@@ -1104,7 +1133,7 @@ function importJSON(e){
   reader.readAsText(file);e.target.value='';
 }
 
-loadLocal();updateFVSelect();render();loadFromSheets();
+loadLocal();updateFCustSelect();updateFVSelect();renderFilterDropdowns();render();loadFromSheets();
 
 // ========== ИНТЕГРАЦИЯ С HR-АССИСТЕНТОМ ==========
 // Открывает модалку добавления кандидата, заполненную данными из HR-ассистента.
@@ -1206,6 +1235,7 @@ return {
   addCustomerUI,
   addManager,
   addSlot,
+  onCustFilterChange,
   clearPoolTagsFilter,
   renderTalentPool,
   addTagUI,
