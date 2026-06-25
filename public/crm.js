@@ -103,11 +103,17 @@ function saveCustomerEdits(){
 
 function openTagsSettings(){
   var rows=TAGS.length?TAGS.map(function(t,i){
-    var count=D.candidates.filter(function(c){return (c.tags||[]).includes(t);}).length;
-    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'+
-      '<span style="flex:1;font-size:13px;">'+t+'</span>'+
-      '<span style="font-size:11px;color:#888;white-space:nowrap;">кандидатов: '+count+'</span>'+
+    var matches=D.candidates.filter(function(c){return (c.tags||[]).includes(t);});
+    var names=matches.length?matches.map(function(c){
+      return '<span class="badge bdef" style="cursor:pointer;margin:2px 4px 2px 0;" onclick="CRM.closeModal();CRM.openEdit(\''+c.id+'\')" title="Открыть карточку">'+c.name+'</span>';
+    }).join(''):'<span style="font-size:12px;color:#aaa;">никого</span>';
+    return '<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #f0f0f0;">'+
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'+
+      '<span style="flex:1;font-size:13px;font-weight:600;">'+t+'</span>'+
+      '<span style="font-size:11px;color:#888;white-space:nowrap;">кандидатов: '+matches.length+'</span>'+
       '<button class="btn btn-sm" style="color:#c62828;border-color:#ef9a9a;flex-shrink:0;" onclick="CRM.removeTagUI('+i+')">✕</button>'+
+      '</div>'+
+      '<div>'+names+'</div>'+
       '</div>';
   }).join(''):'<p style="color:#aaa;font-size:13px;margin-bottom:10px;">Нет тегов.</p>';
   modal('<h2>🏷 Теги кандидатов</h2>'+
