@@ -51,7 +51,7 @@ const VACANCY_STATUSES=['В работе','На паузе','Закрыта','О
 // ── Кадровый резерв (Talent Pool) ─────────────────────────────────
 const TALENT_POOL_LABELS={none:'Нет',reserve:'Резерв',hot_reserve:'Горячий резерв'};
 const RATING_LABELS={A:'A — обязательно вернуть',B:'B — хороший кандидат',C:'C — средний',D:'D — не рассматривать'};
-let TAGS=JSON.parse(localStorage.getItem('crm_tags')||'null')||['РОП','Инженер ПТО','Сметчик','Удаленка','Релокация','Казань'];
+let TAGS=JSON.parse(localStorage.getItem('crm_tags')||'null')||['Удаленка','Релокация'];
 function saveTags(){localStorage.setItem('crm_tags',JSON.stringify(TAGS));}
 function addTag(name){
   const n=(name||'').trim();
