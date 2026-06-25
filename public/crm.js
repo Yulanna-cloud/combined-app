@@ -303,8 +303,6 @@ function migrateRefuseReason(s){
   if(s in map) return map[s];
   return s?'Другое':'';
 }
-// Вакансии прошлой компании — данные по ним можно безвозвратно потерять при миграции
-const OLD_COMPANY_VACANCIES=['Менеджер по продажам','РОП','Project Manager'];
 
 const STAGES=['Скрининг','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер','Обучение','Работает'];
 const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации'];
@@ -317,34 +315,18 @@ function stageLevel(stage){
   return map[stage]??0;
 }
 
-// ── Миграция на новую модель данных ──────────────────────────────
-// Удаляет кандидатов прошлой компании (по списку вакансий) и приводит
-// этапы/статусы/причины отказа оставшихся к новой модели. Идемпотентна —
-// безопасно запускать при каждой загрузке (и из localStorage, и из облака),
-// иначе при следующем "Загрузить" старые данные вернутся обратно.
+// ── Нормализация данных при загрузке ──────────────────────────────
+// Приводит этапы/статусы/причины отказа к текущей модели (безопасно для
+// уже новых значений — функции идемпотентны). Раньше здесь же одноразово
+// удалялись кандидаты "прошлой компании" и всем вакансиям без заказчика
+// проставлялся ЭнергоПромСервис по умолчанию — эта чистка уже выполнена
+// и убрана, чтобы не зацепить будущие вакансии с такими же названиями
+// или новых заказчиков, у которых заказчик пока не выбран.
 function migrateDataV2(){
-  const keepIds=new Set();
-  D.candidates=D.candidates.filter(c=>{
-    if(OLD_COMPANY_VACANCIES.includes(c.vacancy)) return false;
-    keepIds.add(c.id);
-    return true;
-  });
   D.candidates.forEach(c=>{
     c.stage=migrateStage(c.stage);
     c.refuseReason=migrateRefuseReason(c.refuseReason);
   });
-  D.history=D.history.filter(h=>!h.cid||keepIds.has(h.cid));
-
-  // Чистим сам список вакансий от прошлой компании, остальным назначаем заказчика по умолчанию
-  const vacBefore=VACANCIES.length;
-  VACANCIES=VACANCIES.filter(v=>!OLD_COMPANY_VACANCIES.includes(v));
-  let vacChanged=vacBefore!==VACANCIES.length;
-  VACANCIES.forEach(v=>{
-    if(!VAC_META[v]) VAC_META[v]={};
-    if(!VAC_META[v].customerId){ VAC_META[v].customerId='cust_default'; vacChanged=true; }
-    if(!VAC_META[v].status){ VAC_META[v].status='В работе'; vacChanged=true; }
-  });
-  if(vacChanged) saveVacancies();
 }
 
 let D={candidates:[],history:[]};
