@@ -41,7 +41,12 @@ const ANALYTICS = (function () {
     return state && Array.isArray(state.vacancies) ? state.vacancies : [];
   }
   function getPubInfo(hrVacancies, vacTitle) {
-    const v = hrVacancies.find(x => (x.title || '').toLowerCase() === (vacTitle || '').toLowerCase());
+    const target = (vacTitle || '').toLowerCase();
+    const v = hrVacancies.find(x => (x.title || '').toLowerCase() === target) ||
+      hrVacancies.find(x => {
+        const t = (x.title || '').toLowerCase();
+        return t && target && (t.includes(target) || target.includes(t));
+      });
     return {
       source: (v && v.pubSource) || '',
       cost: (v && v.pubCost) || '',
@@ -227,7 +232,7 @@ const ANALYTICS = (function () {
       const costPerHire = (cost && hires) ? Math.round(cost / hires) : null;
       const responseToHire = (responses && hires) ? Math.round((hires / responses) * 100) : null;
       return { vacancy: v, source: pub.source, cost: pub.cost, opened: pub.opened, closed: pub.closed, responses: pub.responses, hires, costPerHire, responseToHire };
-    }).filter(r => r.source || r.cost || r.responses);
+    });
   }
 
   function bar(label, count, pct, colorClass) {
