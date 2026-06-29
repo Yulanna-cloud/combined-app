@@ -631,6 +631,13 @@ function autoFillNextStep(stage, dateRaw) {
   if (stage in map) {
     nextEl.value = map[stage];
   }
+
+  // Для "Вопросы в чат HH" дата шага = сегодня (день, когда вопросы отправлены),
+  // а не дата какого-то будущего события, как у остальных этапов.
+  if (stage === 'Вопросы в чат HH') {
+    const dateEl = document.getElementById('fnd');
+    if (dateEl) dateEl.value = todayStr();
+  }
 }
 
 function openSlotsManager(){
