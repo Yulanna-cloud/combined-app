@@ -305,6 +305,10 @@ function normalizeStatus(s){
   return map[s]??s;
 }
 function migrateStage(s){
+  // Если этап уже в текущем формате (включая новые, добавленные позже —
+  // "Вопросы в чат HH" и т.п.) — не трогаем. Раньше любой этап, отсутствующий
+  // в таблице ниже, тихо сбрасывался на "Скрининг" при каждой загрузке.
+  if(STAGES.includes(s)) return s;
   const map={
     'Отклик':'Скрининг',
     'Интервью HR':'Интервью HR проведено',
@@ -321,6 +325,9 @@ function migrateStage(s){
   return map[s]??'Скрининг';
 }
 function migrateRefuseReason(s){
+  // Та же защита, что и в migrateStage — если причина уже в текущем
+  // списке REFUSE_REASONS, не трогаем её.
+  if(REFUSE_REASONS.includes(s)) return s;
   const map={
     '':'',
     'Слабый':'Низкая квалификация',
