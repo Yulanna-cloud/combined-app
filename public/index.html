@@ -126,6 +126,12 @@
           <button class="btn" onclick="HR.resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
         </div>
         <hr class="divider">
+        <div class="field"><label>Промт для оценки ответов в чате HH</label><textarea id="prompt-chatAnswers" rows="10"></textarea></div>
+        <div style="display:flex;gap:8px;margin-bottom:20px;">
+          <button class="btn btn-primary" onclick="HR.savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
+          <button class="btn" onclick="HR.resetPrompt()"><i class="ti ti-refresh"></i> Сбросить</button>
+        </div>
+        <hr class="divider">
         <div class="field"><label>Промт для разбора интервью</label><textarea id="prompt-interview" rows="12"></textarea></div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-primary" onclick="HR.savePrompt()"><i class="ti ti-check"></i> Сохранить</button>
@@ -193,6 +199,7 @@
         <div class="tabs">
           <button class="tab-btn active" id="tab-btn-resume" onclick="HR.switchTab('resume')">Анализ резюме</button>
           <button class="tab-btn" id="tab-btn-questions" onclick="HR.switchTab('questions')">Вопросы для интервью</button>
+          <button class="tab-btn" id="tab-btn-chatanswers" onclick="HR.switchTab('chatanswers')">💬 Ответы в чате HH</button>
           <button class="tab-btn" id="tab-btn-interview" onclick="HR.switchTab('interview')">Разбор интервью</button>
           <button class="tab-btn" id="tab-btn-rawresume" onclick="HR.switchTab('rawresume')">Резюме</button>
           <button class="tab-btn" id="tab-btn-compare" onclick="HR.switchTab('compare')">⚖️ Сравнить</button>
@@ -202,6 +209,15 @@
           <div class="field"><label>Особый фокус для этого кандидата</label><textarea id="q-focus" rows="3" placeholder="Что особенно важно проверить?"></textarea></div>
           <button class="btn btn-primary btn-full" onclick="HR.generateQuestions()"><i class="ti ti-list"></i> Сгенерировать вопросы для интервью</button>
           <div id="questions-content"></div>
+        </div>
+        <div id="tab-chatanswers" style="display:none;">
+          <div class="info-box info-blue">
+            <i class="ti ti-info-circle"></i>
+            <span>Вставь ответы кандидата из чата HH.ru на уточняющие вопросы — ИИ даст короткий вердикт (звать/не звать), используя уже готовый анализ резюме, без повторного разбора резюме целиком. Это дешевле по токенам.</span>
+          </div>
+          <div class="field"><label>Ответы кандидата из чата HH</label><textarea id="ca-answers" rows="8" placeholder="Вставь сюда переписку или ответы кандидата..."></textarea></div>
+          <button class="btn btn-primary btn-full" onclick="HR.analyzeChatAnswers()"><i class="ti ti-sparkles"></i> Оценить ответы</button>
+          <div id="chatanswers-content"></div>
         </div>
         <div id="tab-compare" style="display:none;">
           <div style="padding:16px 0 8px;">

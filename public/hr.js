@@ -159,7 +159,19 @@ const DEFAULT_PROMPTS = {
 
 7. ОБРАТНАЯ СВЯЗЬ ПО ИНТЕРВЬЮЕРУ — что хорошо сработало, какие вопросы можно было задать иначе
 
-Пиши конкретно, давай практические выводы.`
+Пиши конкретно, давай практические выводы.`,
+
+  chatAnswers: `Ты — опытный рекрутер. Кандидату в чате HH.ru были отправлены уточняющие вопросы по резюме, и он на них ответил.
+
+{VACANCY}
+
+Дай короткий и конкретный вердикт:
+
+1. ВЕРДИКТ — звать на интервью или не звать (однозначно, без "может быть")
+2. ПОЧЕМУ — 2-3 предложения, опираясь на ответы кандидата и риски из анализа резюме
+3. ЕСЛИ ЗВАТЬ — на что обратить внимание на интервью
+
+Это быстрая проверка перед звонком, не полный повторный анализ — пиши кратко, без длинных рассуждений.`
 };
 
 // ── State ─────────────────────────────────────────────────────────
@@ -201,6 +213,7 @@ function applyLoaded() {
   if (state.crmUrl) document.getElementById('crm-url').value = state.crmUrl;
   document.getElementById('prompt-resume').value = state.prompts.resume;
   document.getElementById('prompt-questions').value = state.prompts.questions;
+  document.getElementById('prompt-chatAnswers').value = state.prompts.chatAnswers;
   document.getElementById('prompt-interview').value = state.prompts.interview;
   renderVacancySelect();
   renderCandidates();
@@ -372,6 +385,7 @@ document.getElementById('modal-new-vacancy').addEventListener('click', e => { if
 function savePrompt() {
   state.prompts.resume = document.getElementById('prompt-resume').value;
   state.prompts.questions = document.getElementById('prompt-questions').value;
+  state.prompts.chatAnswers = document.getElementById('prompt-chatAnswers').value;
   state.prompts.interview = document.getElementById('prompt-interview').value;
   save(); toast('Промты сохранены');
 }
@@ -381,6 +395,7 @@ function resetPrompt() {
   state.prompts = { ...DEFAULT_PROMPTS };
   document.getElementById('prompt-resume').value = state.prompts.resume;
   document.getElementById('prompt-questions').value = state.prompts.questions;
+  document.getElementById('prompt-chatAnswers').value = state.prompts.chatAnswers;
   document.getElementById('prompt-interview').value = state.prompts.interview;
   save(); toast('Промты сброшены');
 }
@@ -482,6 +497,8 @@ function openCandidate(id) {
   switchTab('resume');
   document.getElementById('q-focus').value = c.qFocus || '';
   document.getElementById('questions-content').innerHTML = c.questionsHTML || '';
+  document.getElementById('ca-answers').value = c.chatAnswers || '';
+  document.getElementById('chatanswers-content').innerHTML = c.chatAnswersHTML || '';
   document.getElementById('i-transcript').value = c.transcript || '';
   document.getElementById('interview-content').innerHTML = c.interviewHTML || '';
   document.getElementById('resume-content').innerHTML = c.resumeHTML ||
@@ -606,7 +623,7 @@ function deleteCandidate() {
 }
 
 function switchTab(tab) {
-  ['resume','questions','interview','rawresume','compare'].forEach(t => {
+  ['resume','questions','chatanswers','interview','rawresume','compare'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
   });
@@ -952,6 +969,30 @@ function generateQuestions() {
       c.hasQuestions = true;
       save(); renderCandidates();
       el.innerHTML = c.questionsHTML;
+      syncToSheets();
+    },
+    onError: (msg) => { el.innerHTML = errorBox(msg); }
+  });
+}
+
+// Дешёвая по токенам проверка: отправляем уже готовый анализ резюме
+// (не само резюме целиком) + ответы кандидата из чата HH — и просим
+// короткий вердикт "звать/не звать", без повторного полного разбора.
+function analyzeChatAnswers() {
+  const c = currentCandidate(); if (!c) return;
+  const answers = document.getElementById('ca-answers').value.trim();
+  if (!answers) { alert('Вставь ответы кандидата из чата HH'); return; }
+  const el = document.getElementById('chatanswers-content');
+  c.chatAnswers = answers;
+  callAPI({
+    system: buildPrompt('chatAnswers'),
+    user: `АНАЛИЗ РЕЗЮМЕ (включая вопросы, заданные кандидату):\n${c.rawAnalysis}\n\nОТВЕТЫ КАНДИДАТА В ЧАТЕ HH:\n${answers}`,
+    loadingEl: el,
+    onSuccess: (text) => {
+      c.chatAnswersHTML = resultBox('Вердикт по ответам в чате · ' + c.name, text);
+      c.rawAnalysisChatAnswers = text;
+      save(); renderCandidates();
+      el.innerHTML = c.chatAnswersHTML;
       syncToSheets();
     },
     onError: (msg) => { el.innerHTML = errorBox(msg); }
@@ -1323,6 +1364,7 @@ return {
   callAPI,
   parsePDF,
   saveRawResume,
+  analyzeChatAnswers,
   analyzeInterview,
   analyzeResume,
   applyIncomingResume,
