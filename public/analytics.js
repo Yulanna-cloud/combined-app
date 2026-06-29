@@ -1,16 +1,9 @@
 const ANALYTICS = (function () {
 
-  const LEVEL_MAP = {
-    'Скрининг': 0,
-    'Интервью HR назначено': 1,
-    'Интервью HR проведено': 2,
-    'Интервью заказчика назначено': 3,
-    'Интервью заказчика проведено': 4,
-    'Оффер': 5,
-    'Обучение': 6,
-    'Работает': 7
-  };
-  const STAGE_ORDER = Object.keys(LEVEL_MAP);
+  // Порядок этапов — единая точка истины (как в crm.js). Уровень этапа —
+  // это его индекс здесь, поэтому вставка нового этапа в список сама сдвигает
+  // нумерацию везде, где используется levelOf(...) >= N.
+  const STAGE_ORDER = ['Скрининг', 'Вопросы в чат HH', 'Интервью HR назначено', 'Интервью HR проведено', 'Интервью заказчика назначено', 'Интервью заказчика проведено', 'Оффер', 'Обучение', 'Работает'];
   const STARTED_STATUS = 'Трудоустроен';
   const CONFIRMED_STATUS = 'Подтверждён после адаптации';
   const HIRED_STATUSES_LIST = [STARTED_STATUS, CONFIRMED_STATUS];
@@ -18,7 +11,7 @@ const ANALYTICS = (function () {
   // Текущее состояние фильтров (живёт между перерисовками)
   let filters = { customerId: '', vacancy: '', period: 'all', from: '', to: '' };
 
-  function levelOf(stage) { return LEVEL_MAP[stage] ?? 0; }
+  function levelOf(stage) { const i = STAGE_ORDER.indexOf(stage); return i === -1 ? 0 : i; }
 
   function loadJSON(key, fallback) {
     try {
@@ -145,8 +138,8 @@ const ANALYTICS = (function () {
     return vacancies.map(v => {
       const meta = getMeta(vacMeta, v);
       const cands = candidates.filter(c => c.vacancy === v);
-      const interviews = cands.filter(c => levelOf(c.stage) >= 2).length;
-      const offers = cands.filter(c => levelOf(c.stage) >= 5).length;
+      const interviews = cands.filter(c => levelOf(c.stage) >= levelOf('Интервью HR проведено')).length;
+      const offers = cands.filter(c => levelOf(c.stage) >= levelOf('Оффер')).length;
       const hires = cands.filter(c => HIRED_STATUSES_LIST.includes(c.status)).length;
       const opened = parseDate(meta.openedDate);
       const closed = parseDate(meta.closedDate);

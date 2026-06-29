@@ -337,15 +337,18 @@ function migrateRefuseReason(s){
   return s?'Другое':'';
 }
 
-const STAGES=['Скрининг','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер','Обучение','Работает'];
+const STAGES=['Скрининг','Вопросы в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер','Обучение','Работает'];
 const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации'];
-const EVENTS=['Добавлен кандидат','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер отправлен','Оффер принят','Отказ кандидата','Отказ заказчика','Выход на работу'];
+const EVENTS=['Добавлен кандидат','Вопросы отправлены в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер отправлен','Оффер принят','Отказ кандидата','Отказ заказчика','Выход на работу'];
 const REFUSE_REASONS=['','Низкая квалификация','Высокие зарплатные ожидания','Не подходит график','Не подходит локация','Контроффер','Передумал','Не прошел интервью заказчика','Другое'];
 const INACTIVE=['Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации'];
 const REFUSE_STATUSES=['Отказался кандидат','Отказ заказчика','Не пришел на интервью','Не вышел на работу'];
+// Уровень этапа = его индекс в STAGES — единая точка истины, чтобы добавление
+// нового этапа в список автоматически и безопасно сдвигало нумерацию везде,
+// где используются сравнения "достиг этапа X или дальше" (>=).
 function stageLevel(stage){
-  const map={'Скрининг':0,'Интервью HR назначено':1,'Интервью HR проведено':2,'Интервью заказчика назначено':3,'Интервью заказчика проведено':4,'Оффер':5,'Обучение':6,'Работает':7};
-  return map[stage]??0;
+  const i=STAGES.indexOf(stage);
+  return i===-1?0:i;
 }
 
 // ── Нормализация данных при загрузке ──────────────────────────────
@@ -615,6 +618,7 @@ function autoFillNextStep(stage, dateRaw) {
 
   const map = {
     'Скрининг':                          'Назначить видео-интервью с HR',
+    'Вопросы в чат HH':                  'Дождаться ответа в чате HH',
     'Интервью HR назначено':             'Видео-интервью' + dateStr,
     'Интервью HR проведено':             'Назначить встречу с заказчиком',
     'Интервью заказчика назначено':      'Встреча в офисе' + dateStr,
@@ -899,15 +903,15 @@ function buildFunnel(){
     var nc=cands&&cands.length?'<span data-fkey="'+mkKey(cands)+'" data-flabel="'+label.replace(/"/g,'&quot;')+'" style="cursor:pointer;color:#1565c0;font-size:20px;font-weight:700;text-decoration:underline dotted;">'+n+' 👁</span>':'<span style="font-size:20px;font-weight:700;color:#1F3864;">'+n+'</span>';
     return '<tr style="border-bottom:1px solid #e8ecf0'+(green?';background:#f0fff4':'')+'"><td style="padding:11px 14px;font-weight:600;font-size:13px">'+icon+' '+label+'</td><td style="padding:11px 14px;text-align:center;">'+nc+'</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#888">'+pct(n,base)+'</td><td style="padding:11px 14px;text-align:center;font-size:13px;color:#555">'+(prev>0?pct(n,prev):'—')+'</td></tr>';
   }
-  const hrAC=pool.filter(c=>reached(c,1)),hrA=hrAC.length;
-  const hrNS=pool.filter(c=>stageLevel(c.stage)===1&&c.status==='Не пришел на интервью').length;
-  const hrDC=pool.filter(c=>reached(c,2)),hrD=hrDC.length;
-  const ropAC=pool.filter(c=>reached(c,3)),ropA=ropAC.length;
-  const ropNS=pool.filter(c=>stageLevel(c.stage)===3&&c.status==='Не пришел на интервью').length;
-  const ropDC=pool.filter(c=>reached(c,4)),ropD=ropDC.length;
-  const ofC=pool.filter(c=>reached(c,5)),ofN=ofC.length;
-  const trC=pool.filter(c=>reached(c,6)),trN=trC.length;
-  const wkC=pool.filter(c=>reached(c,7)),wkN=wkC.length;
+  const hrAC=pool.filter(c=>reached(c,stageLevel('Интервью HR назначено'))),hrA=hrAC.length;
+  const hrNS=pool.filter(c=>stageLevel(c.stage)===stageLevel('Интервью HR назначено')&&c.status==='Не пришел на интервью').length;
+  const hrDC=pool.filter(c=>reached(c,stageLevel('Интервью HR проведено'))),hrD=hrDC.length;
+  const ropAC=pool.filter(c=>reached(c,stageLevel('Интервью заказчика назначено'))),ropA=ropAC.length;
+  const ropNS=pool.filter(c=>stageLevel(c.stage)===stageLevel('Интервью заказчика назначено')&&c.status==='Не пришел на интервью').length;
+  const ropDC=pool.filter(c=>reached(c,stageLevel('Интервью заказчика проведено'))),ropD=ropDC.length;
+  const ofC=pool.filter(c=>reached(c,stageLevel('Оффер'))),ofN=ofC.length;
+  const trC=pool.filter(c=>reached(c,stageLevel('Обучение'))),trN=trC.length;
+  const wkC=pool.filter(c=>reached(c,stageLevel('Работает'))),wkN=wkC.length;
   const totalRefuse=pool.filter(c=>REFUSE_STATUSES.includes(c.status)).length;
   document.getElementById('reportResult').innerHTML=
     '<div class="section-title" style="margin-top:0">📈 Воронка '+(period?'— '+period:'')+' | '+vacLabel+'</div>'+
