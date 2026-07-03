@@ -349,7 +349,7 @@ function migrateRefuseReason(s){
   return s?'Другое':'';
 }
 
-const STAGES=['Скрининг','Вопросы в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер','Обучение','Работает'];
+const STAGES=['Скрининг','Вопросы в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Повторная встреча с ГД','Оффер','Обучение','Работает'];
 const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Не удалось связаться','Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации'];
 const EVENTS=['Добавлен кандидат','Вопросы отправлены в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер отправлен','Оффер принят','Отказ кандидата','Отказ заказчика','Выход на работу'];
 const REFUSE_REASONS=['','Нерелевантный опыт','Низкая квалификация','Высокие зарплатные ожидания','Не подходит график','Не подходит локация','Контроффер','Передумал','Не прошел интервью заказчика','Другое'];
@@ -633,6 +633,7 @@ function autoFillNextStep(stage, dateRaw) {
     'Интервью HR проведено':             'Назначить встречу с заказчиком',
     'Интервью заказчика назначено':      'Встреча в офисе' + dateStr,
     'Интервью заказчика проведено':      'Решение по кандидату, ОС',
+    'Повторная встреча с ГД':            'Повторная встреча с ГД' + dateStr,
     'Оффер':                             'Дата выхода:' + dateStr,
     'Обучение':                          'Дата начала обучения:' + dateStr,
     'Работает':                          ''
@@ -812,6 +813,41 @@ function openOfficeInvite(cid){
     var cb=document.getElementById('copyOffBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('officeText').value);};
     var eb=document.getElementById('offEmailBtn');if(eb)eb.onclick=function(){
       var subject='Приглашение на встречу — вакансия '+(cand.vacancy||'');
+      emailInvite(cand.id, document.getElementById('officeText').value, subject, 'offEmailStatus');
+    };
+  },100);
+}
+
+// Приглашение на ПОВТОРНУЮ встречу с генеральным директором. Почти как офисное,
+// но с обращением по имени, текстом про ГД и без строки по вакансии.
+function openGDInvite(cid){
+  var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
+  var dateStr='';
+  if(cand.nextDate){var d=new Date(cand.nextDate+'T12:00:00');dateStr=d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
+  var mt=mskTime(cand.meetTime||'');
+  var dateTime=(dateStr||'дата')+(mt?' в '+mt:'');
+  var address='ул. Баки Урманче, 11к1';
+  // Имя (второе слово в ФИО) для обращения; если одно слово — берём его.
+  var parts=(cand.name||'').trim().split(/\s+/);
+  var fname=parts[1]||parts[0]||'';
+  var text='Добрый день, '+fname+'!\n\nПриглашаем вас на повторную встречу с генеральным директором.\n\nДата и время: '+dateTime+'\nАдрес: '+address+'\n\nФИО руководителя: \nТелефон: \n\nПодтвердите встречу, пожалуйста.\nЕсли что-то изменится, сообщите нам.\nСпасибо!';
+  var phone=(cand.contacts||'').replace(/\D/g,'');
+  var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
+  var mgrs=getManagers();
+  var mgrOptions='<option value="">— без руководителя —</option>'+mgrs.map(function(m,i){return '<option value="'+i+'">'+m.name+(m.company?' ('+m.company+')':'')+'</option>';}).join('');
+  var emailBtnHtml='<button id="offEmailBtn" class="btn btn-primary"'+(cand.email?'':' disabled')+' style="background:'+(cand.email?'#D32F2F':'#ccc')+';border-color:'+(cand.email?'#D32F2F':'#ccc')+';'+(cand.email?'':'cursor:not-allowed;')+'" title="'+(cand.email?('Отправить на '+cand.email):'У кандидата не указан email — добавь его в карточке кандидата')+'">📧 Email</button>';
+
+  modal('<h2>🔁 Повторная встреча с ГД</h2>'+
+    (mgrs.length?'<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;"><label style="font-size:13px;font-weight:600;white-space:nowrap;">Руководитель:</label><select id="mgrSelect" style="flex:1;padding:6px 8px;border:1px solid #c8d4e8;border-radius:6px;font-size:13px;">'+mgrOptions+'</select><button class="btn btn-primary" style="white-space:nowrap;" onclick="CRM.insertManager()">Вставить</button></div>':''+
+    '<p style="font-size:12px;color:#aaa;margin-bottom:10px;">Добавь руководителей в Настройки → Руководители</p>')+
+    '<p style="font-size:12px;color:#666;margin-bottom:8px;">Отредактируй текст при необходимости.</p>'+
+    '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button>'+emailBtnHtml+'<button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div id="offEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+  setTimeout(function(){
+    var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
+    var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'_blank');};
+    var cb=document.getElementById('copyOffBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('officeText').value);};
+    var eb=document.getElementById('offEmailBtn');if(eb)eb.onclick=function(){
+      var subject='Приглашение на повторную встречу с генеральным директором';
       emailInvite(cand.id, document.getElementById('officeText').value, subject, 'offEmailStatus');
     };
   },100);
@@ -1077,6 +1113,7 @@ ${(()=>{
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
 <span id="meetBtnsPlaceholder_${id}"></span>
 <button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
+<button class="btn" style="background:#7e57c2;color:#fff;border-color:#7e57c2;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openGDInvite('${id}');},300)" title="Повторная встреча с генеральным директором">🔁 Повторная встреча с ГД</button>
 </div>
 </div>
 <div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -1336,6 +1373,7 @@ return {
   openHist,
   openManagersSettings,
   openOfficeInvite,
+  openGDInvite,
   openReport,
   openSendInvite,
   openSendInviteAgain,
