@@ -735,6 +735,16 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
   } catch(e) { onError(e.message); }
 }
 
+// Вывод ИИ показывается как обычный текст (white-space:pre-wrap), markdown НЕ
+// рендерится — поэтому символы разметки (> ** #) видны буквально. Чистим их,
+// чтобы, например, вопросы для чата HH копировались готовым текстом без значков.
+function stripMd(s) {
+  return String(s)
+    .replace(/^[ \t]*>[ \t]?/gm, '')      // цитаты "> "
+    .replace(/\*\*([^*]+)\*\*/g, '$1')     // **жирный**
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, ''); // # заголовки
+}
+
 function resultBox(label, text) {
   const id = 'rb_' + Math.random().toString(36).slice(2);
   return `<div class="ai-result">
@@ -742,7 +752,7 @@ function resultBox(label, text) {
   <span><i class="ti ti-sparkles"></i> ${label}</span>
   <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.copyText(document.getElementById('${id}').innerText)"><i class="ti ti-copy"></i> Скопировать</button>
 </div>
-<div id="${id}" style="white-space:pre-wrap;">${escHtml(text)}</div>
+<div id="${id}" style="white-space:pre-wrap;">${escHtml(stripMd(text))}</div>
 </div>`;
 }
 
