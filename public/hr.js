@@ -494,10 +494,17 @@ function renderCompanies() {
   }
   el.innerHTML = state.companies.map(c => {
     const vacCount = state.vacancies.filter(v => v.companyId === c.id).length;
+    // «Объединить с…» — если компаний больше одной (частый случай после
+    // миграции: одна фирма распалась на несколько из-за разных описаний).
+    const others = state.companies.filter(x => x.id !== c.id);
+    const mergeCtrl = others.length
+      ? `<select title="Перенести вакансии в другую компанию и удалить эту" onchange="if(this.value){HR.mergeCompany('${c.id}',this.value);}this.value='';" style="max-width:180px;font-size:11px;padding:4px 6px;border:1px solid var(--border-med);border-radius:var(--radius-sm);"><option value="">Объединить с…</option>${others.map(o => '<option value="' + o.id + '">' + escHtml(o.name || '(без названия)') + '</option>').join('')}</select>`
+      : '';
     return `<div style="border:1px solid var(--border-med);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:14px;">
 <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
   <input type="text" value="${escAttr(c.name)}" placeholder="Название компании" onchange="HR.saveCompanyField('${c.id}','name',this.value)" style="flex:1;font-weight:600;">
   <span style="font-size:11px;color:var(--text3);white-space:nowrap;">вакансий: ${vacCount}</span>
+  ${mergeCtrl}
   <button class="btn btn-danger" title="Удалить компанию" onclick="HR.deleteCompany('${c.id}')"><i class="ti ti-trash"></i></button>
 </div>
 <div class="field" style="margin-bottom:10px;"><label>Описание компании</label><textarea rows="3" placeholder="О компании — подставляется в анализ каждой вакансии" onchange="HR.saveCompanyField('${c.id}','desc',this.value)">${escHtml(c.desc || '')}</textarea></div>
@@ -511,6 +518,21 @@ function saveCompanyField(id, field, val) {
   c[field] = val;
   save();
   toast('Сохранено');
+}
+
+// Объединение: переносим все вакансии из компании fromId в toId и удаляем
+// дубль. Описание/сайт целевой компании остаются — их можно поправить.
+function mergeCompany(fromId, toId) {
+  if (fromId === toId) return;
+  const from = getCompany(fromId), to = getCompany(toId);
+  if (!from || !to) return;
+  const cnt = state.vacancies.filter(v => v.companyId === fromId).length;
+  if (!confirm(`Перенести ${cnt} вакансий из «${from.name}» в «${to.name}» и удалить «${from.name}»?`)) return;
+  state.vacancies.forEach(v => { if (v.companyId === fromId) v.companyId = toId; });
+  state.companies = state.companies.filter(x => x.id !== fromId);
+  save();
+  renderCompanies();
+  toast('Компании объединены');
 }
 
 function addCompany() {
@@ -1566,6 +1588,7 @@ return {
   renderCompanies,
   addCompany,
   deleteCompany,
+  mergeCompany,
   saveCompanyField,
   onVacancyCompanyChange,
   checkIncomingResume,
