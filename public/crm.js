@@ -1174,9 +1174,10 @@ loadLocal();updateFCustSelect();updateFVSelect();renderFilterDropdowns();render(
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, source: sourceFromHR }) {
+function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, refuseReason: refuseFromHR, source: sourceFromHR }) {
   if (!nameFromHR) return;
   const initialStatus = (statusFromHR && STATUSES.includes(statusFromHR)) ? statusFromHR : 'В работе';
+  const initialReason = (refuseFromHR && REFUSE_REASONS.includes(refuseFromHR)) ? refuseFromHR : '';
 
   const id = nextId();
   pendingPdfName = '';
@@ -1238,7 +1239,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 <div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div>
 <div class="section-title">Воронка</div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Скрининг')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,initialStatus)}</select></div></div>
-<div class="fr" id="addRefuseHR" style="${REFUSE_STATUSES.includes(initialStatus)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option>'+r+'</option>').join('')}</select></div>
+<div class="fr" id="addRefuseHR" style="${REFUSE_STATUSES.includes(initialStatus)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option'+(r===initialReason?' selected':'')+'>'+r+'</option>').join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>

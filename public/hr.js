@@ -1109,8 +1109,20 @@ function quickAddToCRM(initialStatus) {
   toast(initialStatus ? 'Заведён в CRM как «' + initialStatus + '», проверь и сохрани' : 'Кандидат сохранён, открываю CRM...');
 }
 
+// Угадываем причину отказа по тексту анализа ИИ, чтобы подставить её в модалку
+// CRM (пользователь может поменять). Значения совпадают с REFUSE_REASONS в CRM.
+function guessRefuseReason(analysisText) {
+  const t = (analysisText || '').toLowerCase();
+  if (/зарплат|ожидани|\bз\/п\b|\bзп\b|дорог|бюджет|вилк/.test(t)) return 'Высокие зарплатные ожидания';
+  if (/локац|переезд|другой город|не готов.*город|регион|удал[её]нк/.test(t)) return 'Не подходит локация';
+  if (/график|сменн|вахтов/.test(t)) return 'Не подходит график';
+  if (/квалификац|недостаточн|слаб/.test(t)) return 'Низкая квалификация';
+  return 'Нерелевантный опыт';
+}
+
 // ── CRM export ────────────────────────────────────────────────────
-function addToCRM(candidateId) {
+function addToCRM(candidateId, opts) {
+  opts = opts || {};
   const c = state.candidates.find(x => x.id === candidateId);
   if (!c) return;
 
@@ -1131,10 +1143,18 @@ function addToCRM(candidateId) {
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
+  const status = opts.status || '';
+  // Для отказа подставляем причину: из analysis, если не передана явно.
+  const refuseReason = status === 'Отказ' ? (opts.refuseReason || guessRefuseReason(c.rawAnalysis)) : '';
+
+  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
   switchView('crm');
-  toast('Открываю CRM...');
+  toast(status === 'Отказ' ? 'Заведён в CRM как «Отказ», проверь причину и сохрани' : 'Открываю CRM...');
 }
+
+// Отказ сразу из карточки после анализа: заводим в CRM со статусом «Отказ» и
+// подсказанной причиной.
+function rejectToCRM(candidateId) { addToCRM(candidateId, { status: 'Отказ' }); }
 
 function crmExportBox(candidateId) {
   const c = state.candidates.find(x => x.id === candidateId);
@@ -1144,9 +1164,14 @@ function crmExportBox(candidateId) {
 <strong>Кандидат подходит?</strong>
       ${alreadyAdded ? '✅ Уже добавлен в CRM' : 'Добавь в CRM для дальнейшей работы'}
 </div>
+<div style="display:flex;gap:10px;">
 <button class="btn btn-crm" onclick="HR.addToCRM('${candidateId}')" ${alreadyAdded ? 'style="opacity:0.6"' : ''}>
 <i class="ti ti-database-plus"></i> ${alreadyAdded ? 'Открыть CRM' : 'Добавить в CRM'}
 </button>
+${alreadyAdded ? '' : `<button class="btn btn-crm" style="background:var(--red-text);border-color:var(--red-text);" title="Завести в CRM со статусом «Отказ» и причиной (можно поправить)" onclick="HR.rejectToCRM('${candidateId}')">
+<i class="ti ti-user-x"></i> Отказ → CRM
+</button>`}
+</div>
 </div>`;
 }
 
@@ -1602,6 +1627,7 @@ return {
   buildRating,
   changeVacancy,
   changeVacancyFromCard,
+  rejectToCRM,
   renderCompanies,
   addCompany,
   deleteCompany,
