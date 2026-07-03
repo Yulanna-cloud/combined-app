@@ -889,9 +889,18 @@ function vacancyContext() {
 function buildPrompt(type) { return (state.prompts[type] || DEFAULT_PROMPTS[type] || '').replace('{VACANCY}', vacancyContext()); }
 
 // ── API ───────────────────────────────────────────────────────────
+let _apiBusy = false;
 async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
   if (!state.apiKey) { onError('Сначала укажи API ключ в разделе «Настройки»'); return; }
-  loadingEl.innerHTML = `<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Анализирую...</div>`;
+  // Защита от повторного нажатия: пока запрос идёт, второй клик не запускает
+  // ещё один анализ (иначе — лишний расход токенов и путаница).
+  if (_apiBusy) { toast('Анализ уже идёт, подожди…'); return; }
+  _apiBusy = true;
+  loadingEl.innerHTML = `<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Анализирую… это займёт 10–30 секунд</div>`;
+  // Индикатор выводится ниже полей/кнопок — подскроллим к нему и покажем тост,
+  // чтобы сразу было видно, что команда принята.
+  try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
+  toast('Анализирую…');
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -901,7 +910,15 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message);
     onSuccess(data.content[0].text);
-  } catch(e) { onError(e.message); }
+  } catch(e) {
+    const msg = /Failed to fetch|NetworkError|ERR_/i.test(e.message)
+      ? 'Не удалось связаться с ИИ (проблема сети или неверный API-ключ). Проверь интернет и ключ в «Настройках» и попробуй снова.'
+      : e.message;
+    try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(_) {}
+    onError(msg);
+  } finally {
+    _apiBusy = false;
+  }
 }
 
 // Вывод ИИ показывается как обычный текст (white-space:pre-wrap), markdown НЕ
