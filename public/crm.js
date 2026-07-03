@@ -1174,24 +1174,25 @@ loadLocal();updateFCustSelect();updateFVSelect();renderFilterDropdowns();render(
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, source: sourceFromHR }) {
+function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, source: sourceFromHR }) {
   if (!nameFromHR) return;
 
   const id = nextId();
   pendingPdfName = '';
 
-  // Ищем вакансию в CRM по названию из HR-ассистента; если такой вакансии
-  // в CRM ещё нет — создаём её автоматически (заполнять дважды не нужно).
+  // Ищем вакансию в CRM по ТОЧНОМУ названию из HR-ассистента; если такой
+  // вакансии в CRM ещё нет — создаём её автоматически с этим же названием.
+  // Частичное совпадение здесь использовать нельзя: «Инженер ПТО Пермь»
+  // содержит «Инженер ПТО», и кандидат уезжал не в ту (казанскую) вакансию,
+  // а новая пермская не создавалась.
   let matchedVacancy = '';
-  if (vacancyFromHR) {
-    const exact = VACANCIES.find(v => v.toLowerCase() === vacancyFromHR.toLowerCase());
-    const partial = VACANCIES.find(v =>
-      v.toLowerCase().includes(vacancyFromHR.toLowerCase()) ||
-      vacancyFromHR.toLowerCase().includes(v.toLowerCase())
-    );
-    matchedVacancy = exact || partial || '';
-    if (!matchedVacancy) {
-      matchedVacancy = vacancyFromHR;
+  if (vacancyFromHR && vacancyFromHR.trim()) {
+    const wanted = vacancyFromHR.trim();
+    const exact = VACANCIES.find(v => v.toLowerCase().trim() === wanted.toLowerCase());
+    if (exact) {
+      matchedVacancy = exact;
+    } else {
+      matchedVacancy = wanted;
       VACANCIES.push(matchedVacancy);
       saveVacancies();
       updateFVSelect();
@@ -1199,17 +1200,20 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
   }
   if (!matchedVacancy) matchedVacancy = VACANCIES[0] || '';
 
-  // Привязываем заказчика по названию компании из HR-вакансии — находим
-  // существующего по имени или создаём нового, но только если у вакансии
-  // заказчик ещё не назначен (чтобы не перетирать ручную настройку в CRM).
-  if (customerName && customerName.trim()) {
+  // Переносим поля вакансии из HR-ассистента в мета CRM, но только если они
+  // ещё не заданы вручную в CRM (чтобы не перетирать ручную настройку).
+  if (matchedVacancy) {
     const meta = getVacMeta(matchedVacancy);
-    if (!meta.customerId) {
+    // Заказчик: находим существующего по имени компании или создаём нового.
+    if (customerName && customerName.trim() && !meta.customerId) {
       const trimmed = customerName.trim();
-      let cust = CUSTOMERS.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+      const cust = CUSTOMERS.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
       const custId = cust ? cust.id : addCustomer(trimmed);
       setVacMeta(matchedVacancy, 'customerId', custId);
     }
+    if (siteUrl && siteUrl.trim() && !meta.siteUrl) setVacMeta(matchedVacancy, 'siteUrl', siteUrl.trim());
+    if (openedDate && !meta.openedDate) setVacMeta(matchedVacancy, 'openedDate', openedDate);
+    if (closedDate && !meta.closedDate) setVacMeta(matchedVacancy, 'closedDate', closedDate);
   }
 
   const nameEsc = nameFromHR.replace(/"/g, '&quot;').replace(/'/g, '&#39;');

@@ -330,6 +330,7 @@ function fillVacancyForm() {
   document.getElementById('v-title').value = v.title || '';
   document.getElementById('v-desc').value = v.desc || '';
   document.getElementById('v-company').value = v.company || '';
+  document.getElementById('v-site').value = v.site || '';
   document.getElementById('v-notes').value = v.notes || '';
   document.getElementById('v-pub-source').value = v.pubSource || '';
   document.getElementById('v-pub-cost').value = v.pubCost || '';
@@ -350,10 +351,10 @@ function saveVacancy() {
   };
   if (state.currentVacancyId) {
     const v = currentVacancy();
-    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.company = document.getElementById('v-company').value; v.notes = document.getElementById('v-notes').value; Object.assign(v, pub); }
+    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.company = document.getElementById('v-company').value; v.site = document.getElementById('v-site').value; v.notes = document.getElementById('v-notes').value; Object.assign(v, pub); }
   } else {
     const id = 'v_' + Date.now();
-    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, company: document.getElementById('v-company').value, notes: document.getElementById('v-notes').value, ...pub });
+    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, company: document.getElementById('v-company').value, site: document.getElementById('v-site').value, notes: document.getElementById('v-notes').value, ...pub });
     state.currentVacancyId = id;
   }
   save(); renderVacancySelect(); renderCandidates(); toast('Вакансия сохранена');
@@ -369,7 +370,7 @@ function createVacancy() {
   const name = document.getElementById('modal-vac-name').value.trim();
   if (!name) { alert('Введи название'); return; }
   const id = 'v_' + Date.now();
-  state.vacancies.push({ id, title: name, desc: '', company: '', notes: '', pubSource: '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: '' });
+  state.vacancies.push({ id, title: name, desc: '', company: '', site: '', notes: '', pubSource: '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: '' });
   state.currentVacancyId = id;
   save(); closeModal(); renderVacancySelect(); fillVacancyForm();
   showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + name;
@@ -918,7 +919,7 @@ function quickAddToCRM() {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', siteUrl: v ? v.site : '', openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Кандидат сохранён, открываю CRM...');
 }
@@ -945,7 +946,7 @@ function addToCRM(candidateId) {
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', siteUrl: v ? v.site : '', openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Открываю CRM...');
 }
