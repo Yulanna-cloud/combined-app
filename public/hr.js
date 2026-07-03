@@ -655,7 +655,9 @@ function renderCandidates() {
   list.innerHTML = cands.map(c => {
     // Определяем бейдж вердикта
   let badge = '';
-  if (c.addedToCrm) {
+  if (c.rejected) {
+    badge = `<span class="cand-badge badge-red">🔴 отказ</span>`;
+  } else if (c.addedToCrm) {
     badge = `<span class="cand-badge badge-crm">в CRM</span>`;
   } else if (c.verdict === 'green') {
     badge = `<span class="cand-badge badge-green">🟢 звать</span>`;
@@ -729,6 +731,8 @@ function archiveCandidate() {
   if (!c) return;
   if (!confirm('Переместить ' + c.name + ' в архив отказов?')) return;
   c.archived = true;
+  c.rejected = true;
+  c.verdict = 'red';
   c.archivedAt = new Date().toLocaleDateString('ru-RU');
   state.currentCandidateId = null;
   save();
@@ -1093,10 +1097,12 @@ function quickAddToCRM(initialStatus) {
     if (me) email = me[0];
   }
 
-  // Сохраняем кандидата в ассистент
+  // Сохраняем кандидата в ассистент. Если это сразу «Отказ» — помечаем
+  // отклонённым и архивируем, чтобы в ассистенте был красный статус, а не «в CRM».
+  const isReject = initialStatus === 'Отказ';
   const id = 'c_' + Date.now();
   const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: false, resumeHTML: '', rawAnalysis: '', verdict: '', hasQuestions: false, interviewDone: false, addedToCrm: true });
+  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: isReject, archivedAt: isReject ? date : undefined, rejected: isReject, resumeHTML: '', rawAnalysis: '', verdict: isReject ? 'red' : '', hasQuestions: false, interviewDone: false, addedToCrm: true });
   state.currentCandidateId = id;
   save();
   renderCandidates();
@@ -1153,8 +1159,17 @@ function addToCRM(candidateId, opts) {
 }
 
 // Отказ сразу из карточки после анализа: заводим в CRM со статусом «Отказ» и
-// подсказанной причиной.
-function rejectToCRM(candidateId) { addToCRM(candidateId, { status: 'Отказ' }); }
+// подсказанной причиной, а в ассистенте помечаем красным «отказ» и в архив.
+function rejectToCRM(candidateId) {
+  const c = state.candidates.find(x => x.id === candidateId);
+  if (c) {
+    c.rejected = true;
+    c.archived = true;
+    c.archivedAt = new Date().toLocaleDateString('ru-RU');
+    if (!c.verdict) c.verdict = 'red';
+  }
+  addToCRM(candidateId, { status: 'Отказ' });
+}
 
 function crmExportBox(candidateId) {
   const c = state.candidates.find(x => x.id === candidateId);
