@@ -185,6 +185,7 @@ let state = {
   apiKey: '',
   model: 'claude-sonnet-4-6',
   crmUrl: 'https://yulanna-cloud.github.io/crm/',
+  companies: [],
   vacancies: [],
   currentVacancyId: null,
   candidates: [],
@@ -217,7 +218,65 @@ function load() {
       }
     }
   } catch(e) {}
+  // Одноразовая миграция: раньше «О компании» и «Сайт» хранились в каждой
+  // вакансии по отдельности. Теперь компания — отдельная сущность, а вакансии
+  // ссылаются на неё через companyId и наследуют описание/сайт.
+  if (!Array.isArray(state.companies)) state.companies = [];
+  // Мигрируем, если компаний ещё нет, но у вакансий есть старое поле company
+  // или ещё не проставлен companyId (данные, сохранённые до этой фичи).
+  const needsMigration = state.companies.length === 0 &&
+    (state.vacancies || []).some(v => (v.company && v.company.trim()) || v.companyId === undefined);
+  if (needsMigration) { migrateCompaniesFromVacancies(); save(); }
   applyLoaded();
+}
+
+// Первая строка текста (для названия компании), остальное — в описание.
+function firstLine(s) {
+  const line = String(s || '').split('\n').map(x => x.trim()).find(x => x);
+  return (line || '').slice(0, 80);
+}
+
+// Собираем компании из старых полей vacancy.company; одинаковый текст → одна
+// компания. companyId проставляем, а сами поля company/site очищаем — теперь
+// они работают как необязательное ПЕРЕОПРЕДЕЛЕНИЕ для конкретной вакансии.
+function migrateCompaniesFromVacancies() {
+  const byText = {};
+  (state.vacancies || []).forEach(v => {
+    const text = (v.company || '').trim();
+    if (text) {
+      if (!byText[text]) {
+        const id = 'co_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        state.companies.push({ id, name: firstLine(text), desc: text, site: (v.site || '').trim() });
+        byText[text] = id;
+      }
+      v.companyId = byText[text];
+      v.company = '';
+      v.site = '';
+    } else {
+      v.companyId = v.companyId || '';
+    }
+  });
+}
+
+function getCompany(id) { return state.companies.find(c => c.id === id) || null; }
+
+// Действующее описание/сайт вакансии: переопределение на вакансии имеет
+// приоритет, иначе берётся из привязанной компании.
+function effectiveCompanyDesc(v) {
+  if (!v) return '';
+  if (v.company && v.company.trim()) return v.company;
+  const co = getCompany(v.companyId);
+  return co ? (co.desc || '') : '';
+}
+function effectiveCompanyName(v) {
+  const co = getCompany(v && v.companyId);
+  return co ? (co.name || '') : '';
+}
+function effectiveSite(v) {
+  if (!v) return '';
+  if (v.site && v.site.trim()) return v.site;
+  const co = getCompany(v.companyId);
+  return co ? (co.site || '') : '';
 }
 
 function applyLoaded() {
@@ -325,10 +384,34 @@ function onVacancyChange() {
   if (id) { fillVacancyForm(); showPanel('vacancy'); }
 }
 
+function renderVacancyCompanySelect(selectedId) {
+  const sel = document.getElementById('v-company-id');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— без компании —</option>' +
+    state.companies.map(c => '<option value="' + c.id + '"' + (c.id === selectedId ? ' selected' : '') + '>' + escHtml(c.name || '(без названия)') + '</option>').join('');
+}
+
+// Показываем под селектом, что именно унаследуется от компании (или что
+// вакансия переопределяет это своими полями).
+function updateCompanyInheritHint() {
+  const hint = document.getElementById('company-inherit-hint');
+  if (!hint) return;
+  const co = getCompany(document.getElementById('v-company-id').value);
+  if (!co) { hint.textContent = 'Компания не выбрана — описание и сайт для анализа берутся только из полей вакансии ниже.'; return; }
+  const bits = [];
+  bits.push('Описание: ' + (co.desc ? '«' + firstLine(co.desc) + '…»' : 'не задано'));
+  bits.push('Сайт: ' + (co.site || 'не задан'));
+  hint.textContent = 'Из компании подставится → ' + bits.join(' · ') + '. Поля ниже — только если нужно переопределить.';
+}
+
+function onVacancyCompanyChange() { updateCompanyInheritHint(); }
+
 function fillVacancyForm() {
   const v = currentVacancy(); if (!v) return;
   document.getElementById('v-title').value = v.title || '';
   document.getElementById('v-desc').value = v.desc || '';
+  renderVacancyCompanySelect(v.companyId || '');
+  updateCompanyInheritHint();
   document.getElementById('v-company').value = v.company || '';
   document.getElementById('v-site').value = v.site || '';
   document.getElementById('v-notes').value = v.notes || '';
@@ -349,12 +432,13 @@ function saveVacancy() {
     pubClosed: document.getElementById('v-pub-closed').value,
     pubResponses: document.getElementById('v-pub-responses').value
   };
+  const companyId = document.getElementById('v-company-id').value;
   if (state.currentVacancyId) {
     const v = currentVacancy();
-    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.company = document.getElementById('v-company').value; v.site = document.getElementById('v-site').value; v.notes = document.getElementById('v-notes').value; Object.assign(v, pub); }
+    if (v) { v.title = title; v.desc = document.getElementById('v-desc').value; v.companyId = companyId; v.company = document.getElementById('v-company').value; v.site = document.getElementById('v-site').value; v.notes = document.getElementById('v-notes').value; Object.assign(v, pub); }
   } else {
     const id = 'v_' + Date.now();
-    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, company: document.getElementById('v-company').value, site: document.getElementById('v-site').value, notes: document.getElementById('v-notes').value, ...pub });
+    state.vacancies.push({ id, title, desc: document.getElementById('v-desc').value, companyId, company: document.getElementById('v-company').value, site: document.getElementById('v-site').value, notes: document.getElementById('v-notes').value, ...pub });
     state.currentVacancyId = id;
   }
   save(); renderVacancySelect(); renderCandidates(); toast('Вакансия сохранена');
@@ -370,7 +454,10 @@ function createVacancy() {
   const name = document.getElementById('modal-vac-name').value.trim();
   if (!name) { alert('Введи название'); return; }
   const id = 'v_' + Date.now();
-  state.vacancies.push({ id, title: name, desc: '', company: '', site: '', notes: '', pubSource: '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: '' });
+  // Если компания одна — привязываем новую вакансию к ней сразу (частый случай:
+  // одна компания, много вакансий), чтобы описание/сайт подтянулись без ручной работы.
+  const defaultCompanyId = state.companies.length === 1 ? state.companies[0].id : '';
+  state.vacancies.push({ id, title: name, desc: '', companyId: defaultCompanyId, company: '', site: '', notes: '', pubSource: '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: '' });
   state.currentVacancyId = id;
   save(); closeModal(); renderVacancySelect(); fillVacancyForm();
   showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + name;
@@ -394,6 +481,60 @@ function deleteVacancy() {
 
 function closeModal() { document.getElementById('modal-new-vacancy').classList.remove('open'); }
 document.getElementById('modal-new-vacancy').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// ── Companies (справочник компаний) ───────────────────────────────
+function escAttr(s) { return escHtml(s).replace(/"/g, '&quot;'); }
+
+function renderCompanies() {
+  const el = document.getElementById('companies-list');
+  if (!el) return;
+  if (!state.companies.length) {
+    el.innerHTML = '<div class="empty"><i class="ti ti-building"></i><p>Пока нет компаний. Добавь первую ниже — её описание и сайт будут наследоваться всеми вакансиями.</p></div>';
+    return;
+  }
+  el.innerHTML = state.companies.map(c => {
+    const vacCount = state.vacancies.filter(v => v.companyId === c.id).length;
+    return `<div style="border:1px solid var(--border-med);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:14px;">
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+  <input type="text" value="${escAttr(c.name)}" placeholder="Название компании" onchange="HR.saveCompanyField('${c.id}','name',this.value)" style="flex:1;font-weight:600;">
+  <span style="font-size:11px;color:var(--text3);white-space:nowrap;">вакансий: ${vacCount}</span>
+  <button class="btn btn-danger" title="Удалить компанию" onclick="HR.deleteCompany('${c.id}')"><i class="ti ti-trash"></i></button>
+</div>
+<div class="field" style="margin-bottom:10px;"><label>Описание компании</label><textarea rows="3" placeholder="О компании — подставляется в анализ каждой вакансии" onchange="HR.saveCompanyField('${c.id}','desc',this.value)">${escHtml(c.desc || '')}</textarea></div>
+<div class="field" style="margin-bottom:0;"><label>Сайт компании</label><input type="text" value="${escAttr(c.site)}" placeholder="https://..." onchange="HR.saveCompanyField('${c.id}','site',this.value)"></div>
+</div>`;
+  }).join('');
+}
+
+function saveCompanyField(id, field, val) {
+  const c = getCompany(id); if (!c) return;
+  c[field] = val;
+  save();
+  toast('Сохранено');
+}
+
+function addCompany() {
+  const input = document.getElementById('new-company-name');
+  const name = input.value.trim();
+  if (!name) { toast('Введи название компании'); return; }
+  state.companies.push({ id: 'co_' + Date.now(), name, desc: '', site: '' });
+  save();
+  input.value = '';
+  renderCompanies();
+  toast('Компания добавлена');
+}
+
+function deleteCompany(id) {
+  const c = getCompany(id); if (!c) return;
+  const vacCount = state.vacancies.filter(v => v.companyId === id).length;
+  const warn = vacCount ? ` У ${vacCount} вакансий связь с компанией будет снята.` : '';
+  if (!confirm(`Удалить компанию «${c.name}»?` + warn)) return;
+  state.companies = state.companies.filter(x => x.id !== id);
+  state.vacancies.forEach(v => { if (v.companyId === id) v.companyId = ''; });
+  save();
+  renderCompanies();
+  toast('Компания удалена');
+}
 
 // ── Prompts ───────────────────────────────────────────────────────
 function savePrompt() {
@@ -424,7 +565,7 @@ function showPanel(name) {
     const active = document.querySelector('.panel.active');
     if (active) active.style.display = '';
   }, 0);
-  const titles = { vacancy: 'Вакансия', new: 'Новый кандидат', prompt: 'Промт анализа', settings: 'Настройки' };
+  const titles = { vacancy: 'Вакансия', new: 'Новый кандидат', prompt: 'Промт анализа', settings: 'Настройки', companies: 'Компании' };
   document.getElementById('main-title').textContent = titles[name] || '';
   if (name === 'vacancy') {
     document.getElementById('panel-vacancy').classList.add('active');
@@ -445,6 +586,10 @@ function showPanel(name) {
   } else if (name === 'settings') {
     document.getElementById('panel-settings').classList.add('active');
     document.getElementById('nav-settings').classList.add('active');
+  } else if (name === 'companies') {
+    document.getElementById('panel-companies').classList.add('active');
+    document.getElementById('nav-companies').classList.add('active');
+    renderCompanies();
   } else if (name === 'rating') {
     document.getElementById('panel-rating').classList.add('active');
     document.getElementById('nav-rating').classList.add('active');
@@ -713,7 +858,8 @@ function vacancyContext() {
   const parts = [];
   if (v.title) parts.push('ВАКАНСИЯ: ' + v.title);
   if (v.desc) parts.push('ОПИСАНИЕ ВАКАНСИИ:\n' + v.desc);
-  if (v.company) parts.push('О КОМПАНИИ:\n' + v.company);
+  const companyDesc = effectiveCompanyDesc(v);
+  if (companyDesc) parts.push('О КОМПАНИИ:\n' + companyDesc);
   if (v.notes) parts.push('КОММЕНТАРИИ РЕКРУТЕРА:\n' + v.notes);
   return parts.join('\n\n');
 }
@@ -919,7 +1065,7 @@ function quickAddToCRM() {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', siteUrl: v ? v.site : '', openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Кандидат сохранён, открываю CRM...');
 }
@@ -946,7 +1092,7 @@ function addToCRM(candidateId) {
   c.addedToCrm = true;
   save(); renderCandidates();
 
-  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: v ? v.company : '', siteUrl: v ? v.site : '', openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
   switchView('crm');
   toast('Открываю CRM...');
 }
@@ -1417,6 +1563,11 @@ return {
   buildRating,
   changeVacancy,
   changeVacancyFromCard,
+  renderCompanies,
+  addCompany,
+  deleteCompany,
+  saveCompanyField,
+  onVacancyCompanyChange,
   checkIncomingResume,
   clearAllData,
   clearRatingSelection,

@@ -48,6 +48,9 @@
       <button class="nav-btn" id="nav-new" onclick="HR.showPanel('new')">
         <i class="ti ti-user-plus"></i> Новый кандидат
       </button>
+      <button class="nav-btn" id="nav-companies" onclick="HR.showPanel('companies')">
+        <i class="ti ti-building"></i> Компании
+      </button>
       <button class="nav-btn" id="nav-rating" onclick="HR.showPanel('rating')">
         <i class="ti ti-trophy"></i> Рейтинг
       </button>
@@ -92,8 +95,19 @@
         </div>
         <div class="field"><label>Название вакансии</label><input type="text" id="v-title" placeholder="Например: Инженер-сметчик"></div>
         <div class="field"><label>Описание вакансии (требования, задачи, условия)</label><textarea id="v-desc" rows="7" placeholder="Вставь полный текст вакансии..."></textarea></div>
-        <div class="field"><label>О компании</label><textarea id="v-company" rows="3" placeholder="ЭнергоПромСервис — инжиниринговая компания, Казань..."></textarea></div>
-        <div class="field"><label>Сайт компании</label><input type="text" id="v-site" placeholder="https://... — подставится в карточку вакансии CRM"></div>
+        <div class="field">
+          <label>Компания</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="v-company-id" style="flex:1;" onchange="HR.onVacancyCompanyChange()"></select>
+            <button class="btn" onclick="HR.showPanel('companies')" title="Управление компаниями"><i class="ti ti-building"></i> Компании</button>
+          </div>
+          <p class="field-hint" id="company-inherit-hint"></p>
+        </div>
+        <details style="margin-bottom:16px;">
+          <summary style="font-size:12px;cursor:pointer;color:var(--text2);padding:4px 0;">Переопределить описание/сайт для этой вакансии</summary>
+          <div class="field" style="margin-top:10px;"><label>Описание компании (переопределить)</label><textarea id="v-company" rows="3" placeholder="Пусто = берётся из выбранной компании"></textarea></div>
+          <div class="field" style="margin-bottom:0;"><label>Сайт (переопределить)</label><input type="text" id="v-site" placeholder="Пусто = берётся из выбранной компании"></div>
+        </details>
         <div class="field"><label>Твои комментарии</label><textarea id="v-notes" rows="4" placeholder="Например: важна самостоятельная работа в Гранд-Смете, опыт по ЭОМ обязателен..."></textarea></div>
         <hr class="divider">
         <div class="section-title">Размещение публикации</div>
@@ -107,6 +121,22 @@
         </div>
         <div class="field"><label>Количество откликов</label><input type="number" min="0" id="v-pub-responses" placeholder="Вписать вручную"></div>
         <button class="btn btn-primary btn-full" onclick="HR.saveVacancy()"><i class="ti ti-check"></i> Сохранить вакансию</button>
+      </div>
+
+      <!-- Companies -->
+      <div class="panel" id="panel-companies">
+        <div class="info-box info-blue">
+          <i class="ti ti-info-circle"></i>
+          <span>Компания заводится один раз — её описание и сайт наследуются всеми привязанными вакансиями. В самой вакансии останется указать только её описание.</span>
+        </div>
+        <div id="companies-list"></div>
+        <div class="field" style="margin-top:8px;">
+          <label>Добавить компанию</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="new-company-name" placeholder="Название компании" style="flex:1;">
+            <button class="btn btn-primary" onclick="HR.addCompany()"><i class="ti ti-plus"></i> Добавить</button>
+          </div>
+        </div>
       </div>
 
       <!-- Prompt -->
