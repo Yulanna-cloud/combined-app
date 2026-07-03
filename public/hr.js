@@ -1057,7 +1057,7 @@ function changeVacancyFromCard(sel) {
 }
 
 // ── Быстрое добавление в CRM без анализа ────────────────────────
-function quickAddToCRM() {
+function quickAddToCRM(initialStatus) {
   const name = document.getElementById('c-name').value.trim();
   const resume = document.getElementById('c-resume').value.trim();
   if (!name) { toast('Заполни имя кандидата'); return; }
@@ -1087,9 +1087,9 @@ function quickAddToCRM() {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', source: 'HeadHunter' });
   switchView('crm');
-  toast('Кандидат сохранён, открываю CRM...');
+  toast(initialStatus ? 'Заведён в CRM как «' + initialStatus + '», проверь и сохрани' : 'Кандидат сохранён, открываю CRM...');
 }
 
 // ── CRM export ────────────────────────────────────────────────────
