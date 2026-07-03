@@ -1018,16 +1018,13 @@ function openAdd(){
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
 <div class="fr"><label>ФИО *</label><input id="fn" placeholder="Фамилия Имя Отчество"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,'Менеджер по продажам')}</select></div><div class="fr"><label>Источник</label><input id="fs" placeholder="hh.ru"></div></div>
-<div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div>
-<div class="fr"><label>📧 Email</label><input id="femail" placeholder="ivan@mail.ru"></div>
+<div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" placeholder="+7 999 000-00-00"></div><div class="fr"><label>📧 Email</label><input id="femail" placeholder="ivan@mail.ru"></div></div>
 <div class="section-title">Воронка</div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Скрининг')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuse')">${sel(STATUSES,'В работе')}</select></div></div>
 <div class="fr" id="addRefuse" style="display:none"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
-<div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
+<div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div><div class="fr"></div></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
-<div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
-<div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
 ${talentPoolFieldsHtml(null)}
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>`);
 }
@@ -1042,7 +1039,7 @@ function readTalentPoolFields(){
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',resumeLink:document.getElementById('frl')?.value||'',meetTime:document.getElementById('fmt')?.value||'',hhLink:document.getElementById('fhh')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -1057,29 +1054,13 @@ function openEdit(id){
 <div class="f2"><div class="fr"><label>ID</label><input value="${c.id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${c.added||''}"></div></div>
 <div class="fr"><label>ФИО</label><input id="fn" value="${c.name}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,c.vacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${c.source||''}"></div></div>
-<div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phone}"></div>
-<div class="fr"><label>📧 Email</label><input id="femail" value="${c.email||''}"></div>
+<div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phone}"></div><div class="fr"><label>📧 Email</label><input id="femail" value="${c.email||''}"></div></div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage(c.stage)}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'editRefuse')">${sel(STATUSES,c.status)}</select></div></div>
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
-<div class="fr"><label>Время встречи</label><input type="time" id="fmt" value="${c.meetTime||''}"></div>
+<div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt" value="${c.meetTime||''}"></div><div class="fr"></div></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco">${c.comment||''}</textarea></div>
-<div class="fr"><label>Ссылка на резюме</label><input id="frl" value="${c.resumeLink||''}"></div>
-<div class="fr"><label>Ссылка на HH</label><input id="fhh" value="${c.hhLink||''}"></div>
 ${talentPoolFieldsHtml(c)}
-<div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:14px;border-top:1px solid #eee;">
-<div style="display:flex;gap:6px;flex-wrap:wrap;">
-<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
-<button class="btn" style="color:#555;border-color:#ccc;" onclick="CRM.archiveCandidate('${id}')">🗄 Архив</button>
-<button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="CRM.deleteCandidate('${id}')">🗑 Удалить</button>
-</div>
-<div style="display:flex;gap:6px;flex-wrap:wrap;" id="meetBtnsContainer_${id}">
-<span id="meetBtnsPlaceholder_${id}"></span>
-<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
-<button class="btn" onclick="CRM.closeModal()">Отмена</button>
-<button class="btn btn-primary" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
-</div>
-</div>
 ${(()=>{
   // Тот же человек мог подаваться на другие вакансии в прошлом — показываем как историю участия.
   const other=D.candidates.filter(x=>x.id!==c.id&&x.name.trim().toLowerCase()===c.name.trim().toLowerCase());
@@ -1092,7 +1073,26 @@ ${(()=>{
   if(!hist.length) return '';
   const rows=hist.map(h=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;white-space:nowrap;font-size:12px;color:#666;">'+h.date+'</td><td style="padding:6px 10px;font-size:12px;font-weight:600;">'+(h.event||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td><td style="padding:6px 10px;font-size:12px;color:#444;">'+(h.desc||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td></tr>').join('');
   return '<hr style="margin:16px 0;border-color:#eee;"><div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📋 История кандидата</div><div style="max-height:180px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+rows+'</tbody></table></div>';
-})()}`);
+})()}
+<div id="meetPanel_${id}" style="display:none;margin-top:12px;padding:12px;background:#f7f9fc;border:1px solid #e3e8ef;border-radius:8px;">
+<div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Встреча / приглашение</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<span id="meetBtnsPlaceholder_${id}"></span>
+<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
+</div>
+</div>
+<div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
+<button class="btn" style="color:#555;border-color:#ccc;" onclick="CRM.archiveCandidate('${id}')">🗄 Архив</button>
+<button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="CRM.deleteCandidate('${id}')">🗑 Удалить</button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;">
+<button class="btn" style="background:#ede7f6;color:#5e35b1;border-color:#b39ddb;" onclick="CRM.toggleMeetPanel('${id}')">🏢 Встреча / офис</button>
+<button class="btn" onclick="CRM.closeModal()">Отмена</button>
+<button class="btn btn-primary" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
+</div>
+</div>`);
   var _ec=D.candidates.find(x=>x.id===id);
   var _hm=_ec&&_ec.meetTime&&_ec.meetTime!=='--:--'&&_ec.meetTime!=='';
   setTimeout(function(){
@@ -1108,7 +1108,7 @@ function saveEdit(id){
   // Запоминаем старый этап и статус для истории
   const oldStage=c.stage||'';
   const oldStatus=c.status||'';
-  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.resumeLink=document.getElementById('frl')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.hhLink=document.getElementById('fhh')?.value||'';
+  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';
   if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;
   if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';
   if(document.getElementById('ftp'))Object.assign(c,readTalentPoolFields());
@@ -1143,8 +1143,14 @@ function saveEdit(id){
 }
 function saveEditThenHist(id){
   const c=D.candidates.find(x=>x.id===id);
-  if(c){c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.resumeLink=document.getElementById('frl')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.hhLink=document.getElementById('fhh')?.value||'';if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();}
+  if(c){c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();}
   openHist(id);
+}
+// Показ/скрытие панели «Встреча / офис» в карточке — приглашение нужно не всегда
+// (например, на этапе «Вопросы в чат HH»), поэтому открывается по кнопке.
+function toggleMeetPanel(id){
+  const p=document.getElementById('meetPanel_'+id);
+  if(p) p.style.display = (p.style.display==='none'||!p.style.display) ? 'block' : 'none';
 }
 function openHist(id){
   const c=D.candidates.find(x=>x.id===id);if(!c)return;
@@ -1235,16 +1241,13 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
 <div class="fr"><label>ФИО *</label><input id="fn" value="${nameEsc}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES, matchedVacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${sourceEsc}"></div></div>
-<div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div>
-<div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div>
+<div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div><div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div></div>
 <div class="section-title">Воронка</div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage('Скрининг')}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'addRefuseHR')">${sel(STATUSES,initialStatus)}</select></div></div>
 <div class="fr" id="addRefuseHR" style="${REFUSE_STATUSES.includes(initialStatus)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option'+(r===initialReason?' selected':'')+'>'+r+'</option>').join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
-<div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div>
+<div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div><div class="fr"></div></div>
 <div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
-<div class="fr"><label>Ссылка на резюме</label><input id="frl" placeholder="https://..."></div>
-<div class="fr"><label>Ссылка на HH</label><input id="fhh" placeholder="https://hh.ru/resume/..."></div>
 ${talentPoolFieldsHtml(null)}
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>
 </div>`;
@@ -1383,6 +1386,7 @@ return {
   todayStr,
   toggleDD,
   toggleRefuse,
+  toggleMeetPanel,
   toggleSettingsMenu,
   unarchiveCandidate,
   updateDelCount,
