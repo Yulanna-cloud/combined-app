@@ -38,7 +38,7 @@ const DEFAULT_PROMPTS = {
 
 ВОПРОСЫ ДЛЯ СКРИНИНГА В ЧАТ HH
 Заполняй ТОЛЬКО если решение 🟡 или если кандидат на границе 🔴 — то есть когда резюме не даёт полной картины, но опыт потенциально может быть релевантным.
-Напиши 3-6 коротких вопросов которые можно отправить кандидату в чат HH до звонка. Вопросы должны быть конкретными — про конкретные функции, документы, инструменты. Формат: готовый текст сообщения который можно скопировать и отправить.
+Напиши 3-6 коротких вопросов которые можно отправить кандидату в чат HH до звонка. Вопросы должны быть конкретными — про конкретные функции, документы, инструменты. Формат: готовый текст сообщения который можно скопировать и отправить. Нумеруй вопросы простыми числами с точкой ("1. ", "2. " и т.д.), без каких-либо значков, эмодзи или маркеров перед номером или после него.
 Если кандидат явно подходит (🟢) или явно не подходит (🔴 без сомнений) — этот блок пропусти.
 
 ИТОГ
@@ -457,7 +457,14 @@ function showPanel(name) {
 (() => {
       const cand = currentCandidate();
       const hasAnalysis = cand && cand.rawAnalysis;
-      return '<button class="btn" onclick="HR.resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
+      const vacOpts = state.vacancies.map(v =>
+        '<option value="' + v.id + '"' + (cand && cand.vacancyId === v.id ? ' selected' : '') + '>' + escHtml(v.title) + '</option>'
+      ).join('');
+      const vacSelect = state.vacancies.length > 1
+        ? '<select class="btn" style="max-width:220px;" title="Перевести кандидата на другую вакансию" onchange="HR.changeVacancyFromCard(this)">' + vacOpts + '</select>'
+        : '';
+      return vacSelect +
+        '<button class="btn" onclick="HR.resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
         (hasAnalysis ? '<button class="btn" style="background:#FF6B35;color:#fff;border-color:#FF6B35;" onclick="HR.archiveCandidate()"><i class="ti ti-x"></i> Отказ</button>' : '') +
         '<button class="btn btn-danger" onclick="HR.deleteCandidate()"><i class="ti ti-trash"></i> Удалить</button>';
     })();
@@ -859,6 +866,15 @@ function changeVacancy(newVacId) {
   renderCandidates();
   toast('Вакансия изменена на «' + vac.title + '»');
   syncToSheets();
+}
+
+// Перевод кандидата из выпадающего списка в шапке карточки:
+// если пользователь отменил confirm внутри changeVacancy, возвращаем select обратно
+function changeVacancyFromCard(sel) {
+  const c = currentCandidate();
+  if (!c) return;
+  changeVacancy(sel.value);
+  if (c.vacancyId !== sel.value) sel.value = c.vacancyId;
 }
 
 // ── Быстрое добавление в CRM без анализа ────────────────────────
@@ -1291,11 +1307,14 @@ function applyIncomingResume(payload) {
 
   // Выбираем вакансию
   if (vacancy && state.vacancies.length) {
-    const found = state.vacancies.find(v =>
-      v.title.toLowerCase() === vacancy.toLowerCase() ||
-      v.title.toLowerCase().includes(vacancy.toLowerCase()) ||
-      vacancy.toLowerCase().includes(v.title.toLowerCase())
-    );
+    // Сначала точное совпадение названия — иначе «Инженер ПТО Пермь» из расширения
+    // попадёт в первую частично совпавшую вакансию «Инженер ПТО» (другой город)
+    const vLower = vacancy.toLowerCase().trim();
+    const found = state.vacancies.find(v => v.title.toLowerCase().trim() === vLower)
+      || state.vacancies.find(v =>
+        v.title.toLowerCase().includes(vLower) ||
+        vLower.includes(v.title.toLowerCase())
+      );
     if (found) {
       state.currentVacancyId = found.id;
       document.getElementById('vacancy-select').value = found.id;
@@ -1386,6 +1405,7 @@ return {
   buildPrompt,
   buildRating,
   changeVacancy,
+  changeVacancyFromCard,
   checkIncomingResume,
   clearAllData,
   clearRatingSelection,
