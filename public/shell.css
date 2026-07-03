@@ -1,10 +1,16 @@
 html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+/* Каркас — колонка на всю высоту окна: панель вкладок сверху фиксированной
+   высоты, ниже — активный view, занимающий всё оставшееся место. Так низ
+   view всегда совпадает с низом экрана (без магической calc(100vh - 38px),
+   из-за которой sticky-кнопки внизу обрезались). */
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 .shell-tabs {
   display: flex;
   gap: 4px;
   background: #0d1f35;
   padding: 6px 10px 0;
+  flex-shrink: 0;
 }
 .shell-tab {
   border: none;
@@ -23,5 +29,5 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif
 .shell-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
 .shell-tab.active { background: #eef2f7; color: #1F3864; }
 
-.view { display: none; height: calc(100vh - 38px); overflow-y: auto; }
+.view { display: none; flex: 1; min-height: 0; overflow-y: auto; }
 .view.active { display: block; }
