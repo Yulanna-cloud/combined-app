@@ -263,9 +263,28 @@ function setSyncStatus(msg,type){
   el.style.display='inline-block';el.className='sync-status sync-'+type;el.textContent=msg;
   if(type==='ok')setTimeout(()=>el.style.display='none',3000);
 }
+// Весь конфиг CRM (кроме кандидатов/истории) — чтобы переносить между
+// устройствами: вакансии, цвета, мета (заказчик/сайт/даты), заказчики,
+// теги, руководители (для приглашений) и слоты встреч.
+function crmConfig(){
+  return {vacancies:VACANCIES,vacColors:VAC_COLORS,vacMeta:VAC_META,customers:CUSTOMERS,tags:TAGS,managers:getManagers(),slots:getSlots()};
+}
+function applyCrmConfig(cfg){
+  if(!cfg||typeof cfg!=='object')return;
+  if(Array.isArray(cfg.vacancies)&&cfg.vacancies.length)VACANCIES=cfg.vacancies;
+  if(cfg.vacColors&&typeof cfg.vacColors==='object')VAC_COLORS=cfg.vacColors;
+  if(cfg.vacMeta&&typeof cfg.vacMeta==='object')VAC_META=cfg.vacMeta;
+  if(Array.isArray(cfg.customers))CUSTOMERS=cfg.customers;
+  if(Array.isArray(cfg.tags))TAGS=cfg.tags;
+  saveVacancies();
+  localStorage.setItem('crm_customers',JSON.stringify(CUSTOMERS));
+  localStorage.setItem('crm_tags',JSON.stringify(TAGS));
+  if(Array.isArray(cfg.managers))saveManagers(cfg.managers);
+  if(Array.isArray(cfg.slots))localStorage.setItem('crm_slots',JSON.stringify(cfg.slots));
+}
 function syncToSheets(){
   setSyncStatus('⏳ Сохраняю...','loading');
-  fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({candidates:D.candidates,history:D.history})})
+  fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({candidates:D.candidates,history:D.history,config:crmConfig()})})
     .then(r=>r.json()).then(res=>{res&&res.ok?setSyncStatus('✅ Сохранено!','ok'):setSyncStatus('❌ Ошибка','err');})
     .catch(()=>setSyncStatus('❌ Нет соединения','err'));
 }
@@ -280,8 +299,9 @@ function loadFromSheets(){
         D.candidates=res.data.candidates.map(c=>({...c,status:normalizeStatus(c.status),archived:localMap[c.id]||c.archived||false}));
       }
       if(res.data.history)D.history=res.data.history;
+      if(res.data.config)applyCrmConfig(res.data.config);
       migrateDataV2();
-      saveLocal();render();setSyncStatus('✅ Загружено!','ok');
+      saveLocal();updateFVSelect();render();setSyncStatus('✅ Загружено!','ok');
     }else setSyncStatus('❌ Ошибка загрузки','err');
   };
   script.src=SHEETS_URL+'?action=read&callback='+cbName;
