@@ -1467,7 +1467,7 @@ function syncToSheets() {
   syncStatus('⏳ Сохраняю...', 'loading');
   fetch(SHEETS_URL, {
     method: 'POST',
-    body: JSON.stringify({ action:'save', candidates:encodeForSheets(state.candidates), vacancies:state.vacancies, prompts:state.prompts, model:state.model, crmUrl:state.crmUrl })
+    body: JSON.stringify({ action:'save', candidates:encodeForSheets(state.candidates), companies:state.companies, vacancies:state.vacancies, prompts:state.prompts, model:state.model, crmUrl:state.crmUrl })
   })
   .then(r => r.json())
   .then(res => { if (res && res.ok) syncStatus('✅ Сохранено', 'ok'); else syncStatus('❌ Ошибка', 'err'); })
@@ -1484,6 +1484,7 @@ function loadFromSheets() {
     if (res && res.ok && res.data) {
       const d = res.data;
       if (d.candidates && d.candidates.length) state.candidates = decodeFromSheets(d.candidates);
+      if (d.companies && d.companies.length) state.companies = d.companies;
       if (d.vacancies && d.vacancies.length) state.vacancies = d.vacancies;
       if (d.prompts && Object.keys(d.prompts).length) state.prompts = { ...state.prompts, ...d.prompts };
       if (d.settings) { if (d.settings.model) state.model = d.settings.model; if (d.settings.crmUrl) state.crmUrl = d.settings.crmUrl; }
