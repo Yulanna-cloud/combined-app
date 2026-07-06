@@ -907,14 +907,21 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
   try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
   toast('Анализирую…');
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('https://apinet.cloud/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': state.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: state.model || 'claude-sonnet-4-6', max_tokens: 4000, system, messages: [{ role: 'user', content: user }] })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.apiKey}` },
+      body: JSON.stringify({
+        model: state.model || 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ]
+      })
     });
     const data = await resp.json();
-    if (data.error) throw new Error(data.error.message);
-    onSuccess(data.content[0].text);
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    onSuccess(data.choices[0].message.content);
   } catch(e) {
     const msg = /Failed to fetch|NetworkError|ERR_/i.test(e.message)
       ? 'Не удалось связаться с ИИ (проблема сети или неверный API-ключ). Проверь интернет и ключ в «Настройках» и попробуй снова.'
