@@ -1403,29 +1403,55 @@ function clearRatingSelection() {
   document.getElementById('rating-result').innerHTML = '';
 }
 
+// Рейтинг строится группами по RATING_BATCH_SIZE кандидатов (ограничение по
+// токенам одного запроса), после чего результаты групп сводятся в единый
+// финальный рейтинг отдельным запросом — так можно оценивать любое число
+// кандидатов, а не только 10 за раз.
+const RATING_BATCH_SIZE = 8;
+
+function ratingCandBlock(c, i) {
+  return '=== КАНДИДАТ ' + (i + 1) + ': ' + c.name + ' ===\n' +
+    'Резюме:\n' + (c.resume || 'нет') + '\n' +
+    (c.rawAnalysis ? 'Предыдущий анализ:\n' + c.rawAnalysis : '');
+}
+
+function callAPIAsync(system, user, loadingEl) {
+  return new Promise((resolve, reject) => {
+    callAPI({ system, user, loadingEl, onSuccess: resolve, onError: reject });
+  });
+}
+
 function buildRating() {
   const selected = [...document.querySelectorAll('.rating-checkbox:checked')].map(cb => cb.getAttribute('data-cid'));
   if (selected.length < 2) { toast('Выбери минимум 2 кандидатов'); return; }
-  if (selected.length > 10) { toast('Максимум 10 кандидатов за раз'); return; }
   const vacId = document.getElementById('rating-vacancy-select')?.value;
   const vac = state.vacancies.find(v => v.id === vacId);
   const candidates = selected.map(id => state.candidates.find(c => c.id === id)).filter(Boolean);
   const el = document.getElementById('rating-result');
+  const btn = document.getElementById('rating-btn');
+  btn.disabled = true;
   el.innerHTML = '<div class="empty"><i class="ti ti-loader ti-spin"></i><p>Строю рейтинг...</p></div>';
-  document.getElementById('rating-btn').disabled = true;
+
   const vacContext = vac ? 'ВАКАНСИЯ: ' + vac.title + (vac.desc ? '\nТребования:\n' + vac.desc : '') + (vac.notes ? '\nКомментарии:\n' + vac.notes : '') : '';
-  const candidatesText = candidates.map((c, i) =>
-    '=== КАНДИДАТ ' + (i+1) + ': ' + c.name + ' ===\n' +
-    'Резюме:\n' + (c.resume || 'нет') + '\n' +
-    (c.rawAnalysis ? 'Предыдущий анализ:\n' + c.rawAnalysis : '')
-  ).join('\n\n');
-  const prompt = `Ты опытный рекрутер. Сравни кандидатов и выстрой рейтинг от лучшего к худшему.
 
-${vacContext}
+  // Автосохранение — результат сохраняется сразу, не дожидаясь отдельного клика,
+  // чтобы переход на другую страницу/раздел не терял рейтинг.
+  function finish(text) {
+    el.innerHTML = resultBox('Рейтинг — ' + (vac ? vac.title : ''), text);
+    saveRating(vacId, text);
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-top:8px;font-size:11px;color:var(--text3);';
+    note.innerHTML = '💾 Сохранено автоматически';
+    el.appendChild(note);
+    btn.disabled = false;
+  }
 
-${candidatesText}
+  function fail(msg) {
+    el.innerHTML = errorBox(msg);
+    btn.disabled = false;
+  }
 
-ФОРМАТ ОТВЕТА:
+  const RATING_FORMAT_TAIL = `ФОРМАТ ОТВЕТА:
 
 РЕЙТИНГ:
 #1 [ФИО] — X/10
@@ -1440,34 +1466,40 @@ ${candidatesText}
 Пропустить: [ФИО] — если есть явно неподходящие
 
 Максимум 350 слов. Только факты.`;
-  callAPI({
-    system: prompt,
-    user: 'Построй рейтинг.',
-    loadingEl: el,
-    onSuccess: (text) => {
-      el.innerHTML = resultBox('Рейтинг — ' + (vac ? vac.title : ''), text);
-      // Кнопка сохранения
-      const saveDiv = document.createElement('div');
-      saveDiv.style.cssText = 'margin-top:10px;display:flex;gap:8px;';
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'btn btn-primary';
-      saveBtn.style.fontSize = '12px';
-      saveBtn.innerHTML = '💾 Сохранить рейтинг';
-      saveBtn.onclick = function() {
-        saveRating(vacId, text);
-        saveBtn.innerHTML = '✅ Сохранено';
-        saveBtn.disabled = true;
-        toast('Рейтинг сохранён');
-      };
-      saveDiv.appendChild(saveBtn);
-      el.appendChild(saveDiv);
-      document.getElementById('rating-btn').disabled = false;
-    },
-    onError: (msg) => {
-      el.innerHTML = errorBox(msg);
-      document.getElementById('rating-btn').disabled = false;
+
+  if (candidates.length <= RATING_BATCH_SIZE) {
+    const prompt = 'Ты опытный рекрутер. Сравни кандидатов и выстрой рейтинг от лучшего к худшему.\n\n' +
+      vacContext + '\n\n' + candidates.map(ratingCandBlock).join('\n\n') + '\n\n' + RATING_FORMAT_TAIL;
+    callAPI({ system: prompt, user: 'Построй рейтинг.', loadingEl: el, onSuccess: finish, onError: fail });
+    return;
+  }
+
+  // Батч-режим для больших списков (например 16 кандидатов).
+  const batches = [];
+  for (let i = 0; i < candidates.length; i += RATING_BATCH_SIZE) batches.push(candidates.slice(i, i + RATING_BATCH_SIZE));
+
+  (async () => {
+    try {
+      const batchResults = [];
+      for (let i = 0; i < batches.length; i++) {
+        el.innerHTML = '<div class="empty"><i class="ti ti-loader ti-spin"></i><p>Анализирую группу ' + (i + 1) + ' из ' + batches.length + ' (' + batches[i].length + ' чел.)...</p></div>';
+        const batchPrompt = 'Ты опытный рекрутер. Оцени каждого кандидата по вакансии, дай оценку X/10, кратко и только по фактам из резюме.\n\n' +
+          vacContext + '\n\n' + batches[i].map(ratingCandBlock).join('\n\n') + '\n\n' +
+          'ФОРМАТ ОТВЕТА (для каждого кандидата, порядок как в списке, без сортировки):\n[ФИО] — X/10\nПлюс: одна фраза\nРиск: одна фраза\n\nБез лишних слов.';
+        const text = await callAPIAsync(batchPrompt, 'Оцени кандидатов.', el);
+        batchResults.push(text);
+      }
+
+      el.innerHTML = '<div class="empty"><i class="ti ti-loader ti-spin"></i><p>Свожу итоговый рейтинг по всем ' + candidates.length + ' кандидатам...</p></div>';
+      const finalPrompt = 'Ты опытный рекрутер. Ниже — оценки кандидатов по группам (группы оценивались отдельно, поэтому выровняй шкалу между ними по фактам, а не по формальным цифрам). Составь ЕДИНЫЙ рейтинг от лучшего к худшему по всем кандидатам вместе.\n\n' +
+        vacContext + '\n\n' + batchResults.map((t, i) => '--- Группа ' + (i + 1) + ' ---\n' + t).join('\n\n') + '\n\n' +
+        'ФОРМАТ ОТВЕТА:\n\nРЕЙТИНГ (все ' + candidates.length + ' кандидатов):\n#1 [ФИО] — X/10\nГлавный плюс: одна фраза\nГлавный риск: одна фраза\nРешение: Звать первым / Звать / Уточнить / Не рассматривать\n\n(и так для каждого кандидата, по убыванию)\n\nИТОГ:\nЗвонить первому: [ФИО]\nПропустить: [ФИО] — если есть явно неподходящие\n\nМаксимум 500 слов. Только факты, не выдумывай.';
+      const finalText = await callAPIAsync(finalPrompt, 'Собери итоговый рейтинг.', el);
+      finish(finalText);
+    } catch (e) {
+      fail(e.message || String(e));
     }
-  });
+  })();
 }
 
 function syncToSheets() {
