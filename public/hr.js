@@ -1354,6 +1354,18 @@ function getSavedRatings() {
   let migrated = false;
   Object.keys(r).forEach(vacId => {
     if (r[vacId] && !Array.isArray(r[vacId])) { r[vacId] = [r[vacId]]; migrated = true; }
+    // Старые записи (сохранённые до появления candidateIds) не знают, кто в них
+    // входил. Разумное предположение: туда вошли все кандидаты, которые сейчас
+    // числятся по этой вакансии в ассистенте — иначе все они после обновления
+    // кода ошибочно считались бы «непросчитанными».
+    (r[vacId] || []).forEach(entry => {
+      if (entry && !entry.candidateIds) {
+        entry.candidateIds = (state.candidates || [])
+          .filter(c => !c.archived && (c.vacancyId === vacId || !c.vacancyId))
+          .map(c => c.id);
+        migrated = true;
+      }
+    });
   });
   if (migrated) localStorage.setItem('crm_ratings', JSON.stringify(r));
   return r;
