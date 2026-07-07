@@ -1476,10 +1476,11 @@ function renderRatingCandidates() {
     list.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center;">Нет кандидатов по этой вакансии</div>';
     return;
   }
-  // Кандидаты, не вошедшие в последний сохранённый рейтинг по этой вакансии —
-  // помечаем как новых/непросчитанных, чтобы легко выбрать только их.
+  // «Просчитан» = встречался хоть в одном сохранённом рейтинге по этой вакансии
+  // (а не только в самом последнем) — иначе кандидаты, не попавшие в очередной
+  // точечный прогон по новым, снова ошибочно считались бы новыми.
   const history = getSavedRatings()[vacId] || [];
-  const lastRatedIds = new Set(history[0]?.candidateIds || []);
+  const lastRatedIds = new Set(history.flatMap(h => h.candidateIds || []));
   list.innerHTML = candidates.map(c => {
     const verdict = c.verdict === 'green' ? '🟢' : c.verdict === 'yellow' ? '🟡' : c.verdict === 'red' ? '🔴' : '⚪';
     const hasAnalysis = c.rawAnalysis ? '<span style="color:var(--green);">✓ анализ</span>' : '<span style="color:var(--text3);">без анализа</span>';
