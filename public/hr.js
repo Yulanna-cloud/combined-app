@@ -651,8 +651,14 @@ function currentCandidate() { return state.candidates.find(c => c.id === state.c
 
 function renderCandidates() {
   const list = document.getElementById('candidates-list');
-  const cands = filteredCandidates().filter(c => _showingArchive ? c.archived : !c.archived);
-  if (!cands.length) { list.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:rgba(255,255,255,0.3);">Нет кандидатов</div>'; return; }
+  let cands = filteredCandidates().filter(c => _showingArchive ? c.archived : !c.archived);
+  if (_candidateSearch) cands = cands.filter(c => (c.name || '').toLowerCase().includes(_candidateSearch));
+  if (!cands.length) {
+    list.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:rgba(255,255,255,0.3);">' +
+      (_candidateSearch ? 'Никого не нашлось по «' + escHtml(_candidateSearch) + '»' : 'Нет кандидатов') +
+      '</div>';
+    return;
+  }
   list.innerHTML = cands.map(c => {
     // Определяем бейдж вердикта
   let badge = '';
@@ -701,6 +707,13 @@ function openCandidate(id) {
 // ── Архив отказов ────────────────────────────────────────────────
 let _showingArchive = false;
 
+// ── Поиск по кандидатам в сайдбаре ─────────────────────────────────
+let _candidateSearch = '';
+function setCandidateSearch(q) {
+  _candidateSearch = (q || '').trim().toLowerCase();
+  renderCandidates();
+}
+
 function showCompareFromNew() {
   // Сохраняем текущего кандидата если ещё не сохранён
   const name = document.getElementById('c-name')?.value.trim();
@@ -727,10 +740,14 @@ function showCompareFromNew() {
   setTimeout(() => switchTab('compare'), 200);
 }
 
+// Отказ из карточки кандидата: архивируем локально в ассистенте И переносим
+// статус «Отказ» в CRM (та же логика, что и у кнопки «Отказ → CRM» на вкладке
+// «Анализ резюме»), чтобы кандидат уходил из активных в CRM, а не только
+// пропадал из списка ассистента.
 function archiveCandidate() {
   const c = currentCandidate();
   if (!c) return;
-  if (!confirm('Переместить ' + c.name + ' в архив отказов?')) return;
+  if (!confirm('Отказать ' + c.name + '? Кандидат уйдёт в архив ассистента, а в CRM проставится статус «Отказ».')) return;
   c.archived = true;
   c.rejected = true;
   c.verdict = 'red';
@@ -738,9 +755,8 @@ function archiveCandidate() {
   state.currentCandidateId = null;
   save();
   renderCandidates();
-  showPanel('new');
   syncToSheets();
-  toast(c.name + ' перемещён в архив');
+  addToCRM(c.id, { status: 'Отказ' });
 }
 
 function toggleArchiveView() {
@@ -1328,9 +1344,33 @@ function decodeFromSheets(candidates) {
 }
 
 // ── Рейтинг кандидатов ───────────────────────────────────────────
-function getSavedRatings() { try { return JSON.parse(localStorage.getItem('crm_ratings')||'{}'); } catch(e) { return {}; } }
-function saveRating(vacId, text) { const r = getSavedRatings(); r[vacId] = { text, date: new Date().toLocaleDateString('ru-RU'), vacTitle: (state.vacancies.find(v=>v.id===vacId)||{}).title||'' }; localStorage.setItem('crm_ratings', JSON.stringify(r)); }
-function deleteSavedRating(vacId) { const r = getSavedRatings(); delete r[vacId]; localStorage.setItem('crm_ratings', JSON.stringify(r)); }
+// Формат хранения: { [vacId]: [ {text, date, vacTitle, candidateIds}, ... ] }
+// Новые записи добавляются в начало массива — так по вакансии хранится
+// история рейтингов, а не только последний (старый формат — одиночный
+// объект — при первом обращении автоматически переводится в массив).
+function getSavedRatings() {
+  let r;
+  try { r = JSON.parse(localStorage.getItem('crm_ratings') || '{}'); } catch (e) { return {}; }
+  let migrated = false;
+  Object.keys(r).forEach(vacId => {
+    if (r[vacId] && !Array.isArray(r[vacId])) { r[vacId] = [r[vacId]]; migrated = true; }
+  });
+  if (migrated) localStorage.setItem('crm_ratings', JSON.stringify(r));
+  return r;
+}
+function saveRating(vacId, text, candidateIds) {
+  const r = getSavedRatings();
+  const entry = { text, date: new Date().toLocaleDateString('ru-RU'), vacTitle: (state.vacancies.find(v => v.id === vacId) || {}).title || '', candidateIds: candidateIds || [] };
+  r[vacId] = [entry, ...(r[vacId] || [])];
+  localStorage.setItem('crm_ratings', JSON.stringify(r));
+}
+function deleteSavedRating(vacId, index) {
+  const r = getSavedRatings();
+  if (!r[vacId]) return;
+  if (index === undefined) { delete r[vacId]; }
+  else { r[vacId].splice(index, 1); if (!r[vacId].length) delete r[vacId]; }
+  localStorage.setItem('crm_ratings', JSON.stringify(r));
+}
 
 function populateRatingPanel() {
   const sel = document.getElementById('rating-vacancy-select');
@@ -1348,24 +1388,65 @@ function showSavedRating() {
   const vacId = document.getElementById('rating-vacancy-select')?.value;
   const el = document.getElementById('rating-result');
   if (!el) return;
-  const saved = getSavedRatings()[vacId];
-  if (saved) {
-    el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-      '<span style="font-size:11px;color:var(--text3);">💾 Сохранённый рейтинг от ' + saved.date + '</span>' +
-      '<button class="btn btn-danger" style="font-size:11px;padding:3px 10px;" onclick="HR.deleteSavedRatingAndClear()">🗑 Удалить</button>' +
-      '</div>' +
-      resultBox('Рейтинг — ' + saved.vacTitle, saved.text);
+  const history = getSavedRatings()[vacId] || [];
+  if (!history.length) { el.innerHTML = ''; return; }
+  renderRatingHistory(vacId, history, 0);
+}
+
+function renderRatingHistory(vacId, history, openIndex) {
+  const el = document.getElementById('rating-result');
+  if (!el) return;
+  const latest = history[0];
+  const historyToggle = history.length > 1
+    ? '<button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.toggleRatingHistoryList()">🕘 История (' + history.length + ')</button>'
+    : '';
+  el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">' +
+    '<span style="font-size:11px;color:var(--text3);">💾 Рейтинг от ' + latest.date + (latest.candidateIds ? ' · ' + latest.candidateIds.length + ' чел.' : '') + '</span>' +
+    '<div style="display:flex;gap:6px;">' + historyToggle +
+    '<button class="btn btn-danger" style="font-size:11px;padding:3px 10px;" onclick="HR.deleteSavedRatingAndClear(0)">🗑 Удалить</button>' +
+    '</div></div>' +
+    '<div id="rating-history-list" style="display:none;margin-bottom:10px;border:1px solid var(--border-med);border-radius:var(--radius);"></div>' +
+    resultBox('Рейтинг — ' + latest.vacTitle, latest.text);
+  el._ratingHistory = history;
+  el._ratingVacId = vacId;
+}
+
+function toggleRatingHistoryList() {
+  const box = document.getElementById('rating-history-list');
+  const el = document.getElementById('rating-result');
+  if (!box || !el) return;
+  if (box.style.display === 'none') {
+    const history = el._ratingHistory || [];
+    box.innerHTML = history.map((h, i) =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border-light);font-size:12px;">' +
+      '<span>' + (i === 0 ? '<b>Текущий</b>' : 'от ' + h.date) + (h.candidateIds ? ' · ' + h.candidateIds.length + ' чел.' : '') + '</span>' +
+      '<div style="display:flex;gap:6px;">' +
+      (i !== 0 ? '<button class="btn" style="font-size:11px;padding:2px 8px;" onclick="HR.viewHistoricRating(' + i + ')">Открыть</button>' : '') +
+      '<button class="btn btn-danger" style="font-size:11px;padding:2px 8px;" onclick="HR.deleteSavedRatingAndClear(' + i + ')">🗑</button>' +
+      '</div></div>'
+    ).join('');
+    box.style.display = 'block';
   } else {
-    el.innerHTML = '';
+    box.style.display = 'none';
   }
 }
 
-function deleteSavedRatingAndClear() {
+function viewHistoricRating(index) {
+  const el = document.getElementById('rating-result');
+  const history = el?._ratingHistory || [];
+  const h = history[index];
+  if (!h) return;
+  const box = document.getElementById('rating-history-list');
+  const wasOpen = box ? box.outerHTML : '';
+  el.innerHTML = '<div style="margin-bottom:8px;"><button class="btn" style="font-size:11px;padding:3px 10px;" onclick="HR.showSavedRating()">← Назад к текущему</button> <span style="font-size:11px;color:var(--text3);">Рейтинг от ' + h.date + '</span></div>' + resultBox('Рейтинг — ' + h.vacTitle, h.text);
+}
+
+function deleteSavedRatingAndClear(index) {
   const vacId = document.getElementById('rating-vacancy-select')?.value;
   if (!vacId) return;
-  if (!confirm('Удалить сохранённый рейтинг?')) return;
-  deleteSavedRating(vacId);
-  document.getElementById('rating-result').innerHTML = '';
+  if (!confirm('Удалить этот сохранённый рейтинг?')) return;
+  deleteSavedRating(vacId, index);
+  showSavedRating();
   toast('Рейтинг удалён');
 }
 
@@ -1383,19 +1464,37 @@ function renderRatingCandidates() {
     list.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center;">Нет кандидатов по этой вакансии</div>';
     return;
   }
+  // Кандидаты, не вошедшие в последний сохранённый рейтинг по этой вакансии —
+  // помечаем как новых/непросчитанных, чтобы легко выбрать только их.
+  const history = getSavedRatings()[vacId] || [];
+  const lastRatedIds = new Set(history[0]?.candidateIds || []);
   list.innerHTML = candidates.map(c => {
     const verdict = c.verdict === 'green' ? '🟢' : c.verdict === 'yellow' ? '🟡' : c.verdict === 'red' ? '🔴' : '⚪';
     const hasAnalysis = c.rawAnalysis ? '<span style="color:var(--green);">✓ анализ</span>' : '<span style="color:var(--text3);">без анализа</span>';
+    const isUnrated = history.length > 0 && !lastRatedIds.has(c.id);
+    const unratedBadge = isUnrated ? '<span style="color:var(--navy);font-weight:600;">🆕 не в рейтинге</span>' : '';
     return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border-light);cursor:pointer;">' +
-      '<input type="checkbox" class="rating-checkbox" data-cid="' + c.id + '" style="width:16px;height:16px;cursor:pointer;">' +
+      '<input type="checkbox" class="rating-checkbox" data-cid="' + c.id + '"' + (isUnrated ? ' data-unrated="1"' : '') + ' style="width:16px;height:16px;cursor:pointer;">' +
       '<span style="flex:1;font-size:13px;">' + verdict + ' ' + c.name + '</span>' +
-      '<span style="font-size:11px;">' + hasAnalysis + '</span>' +
+      '<span style="font-size:11px;">' + (unratedBadge || hasAnalysis) + '</span>' +
       '</label>';
   }).join('');
 }
 
 function selectAllForRating() {
   document.querySelectorAll('.rating-checkbox').forEach(cb => cb.checked = true);
+}
+
+function selectUnratedForRating() {
+  const boxes = document.querySelectorAll('.rating-checkbox');
+  let count = 0;
+  boxes.forEach(cb => {
+    const isUnrated = cb.getAttribute('data-unrated') === '1';
+    cb.checked = isUnrated;
+    if (isUnrated) count++;
+  });
+  if (!count) toast('Все текущие кандидаты уже в последнем рейтинге');
+  else toast('Выбрано непросчитанных: ' + count);
 }
 
 function clearRatingSelection() {
@@ -1437,8 +1536,9 @@ function buildRating() {
   // Автосохранение — результат сохраняется сразу, не дожидаясь отдельного клика,
   // чтобы переход на другую страницу/раздел не терял рейтинг.
   function finish(text) {
-    el.innerHTML = resultBox('Рейтинг — ' + (vac ? vac.title : ''), text);
-    saveRating(vacId, text);
+    saveRating(vacId, text, candidates.map(c => c.id));
+    showSavedRating();
+    renderRatingCandidates();
     const note = document.createElement('div');
     note.style.cssText = 'margin-top:8px;font-size:11px;color:var(--text3);';
     note.innerHTML = '💾 Сохранено автоматически';
@@ -1679,6 +1779,7 @@ return {
   applyIncomingResume,
   applyLoaded,
   archiveCandidate,
+  setCandidateSearch,
   buildPrompt,
   buildRating,
   changeVacancy,
@@ -1739,6 +1840,9 @@ return {
   saveSettings,
   saveVacancy,
   selectAllForRating,
+  selectUnratedForRating,
+  toggleRatingHistoryList,
+  viewHistoricRating,
   setPdfArea,
   showCompareFromNew,
   showPanel,
