@@ -63,6 +63,7 @@
     </div>
     <div class="candidates-section">
       <div class="cands-label">Кандидаты</div>
+      <input type="text" id="candidate-search" placeholder="🔍 Поиск по имени..." oninput="HR.setCandidateSearch(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;font-size:13px;">
       <div id="candidates-list"></div>
     </div>
     <div class="sidebar-footer">
@@ -219,6 +220,7 @@
             <select id="rating-vacancy-select"></select>
           </div>
           <button class="btn" onclick="HR.selectAllForRating()">✓ Все</button>
+          <button class="btn" onclick="HR.selectUnratedForRating()" title="Выбрать только тех, кто не входил в последний сохранённый рейтинг">🆕 Непросчитанные</button>
           <button class="btn" onclick="HR.clearRatingSelection()">✕ Сбросить</button>
         </div>
         <div id="rating-candidates-list" style="margin-bottom:16px;max-height:280px;overflow-y:auto;border:1px solid var(--border-med);border-radius:var(--radius);"></div>
