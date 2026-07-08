@@ -434,6 +434,21 @@ function talentPoolFieldsHtml(c){
 }
 function selStage(val){const opts=[...STAGES];if(val&&!opts.includes(val))opts.push(val);return opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');}
 function toggleRefuse(s,divId){const d=document.getElementById(divId);if(d)d.style.display=REFUSE_STATUSES.includes(s.value)?'block':'none';}
+// Форматирует телефон для удобного чтения: +7 999 123-45-67 вместо
+// слитной строки цифр. Если номер не подходит под привычный формат — просто
+// возвращает как есть, ничего не ломает.
+function formatPhoneRu(raw){
+  if(!raw) return '';
+  const digits=raw.replace(/\D/g,'');
+  if(digits.length===11 && (digits[0]==='7'||digits[0]==='8')){
+    return '+7 '+digits.slice(1,4)+' '+digits.slice(4,7)+'-'+digits.slice(7,9)+'-'+digits.slice(9,11);
+  }
+  if(digits.length===10){
+    return '+7 '+digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6,8)+'-'+digits.slice(8,10);
+  }
+  return raw;
+}
+
 function sbadge(s){
   const m={'В работе':'bw','Перенос собеседования':'bpurple','Трудоустроен':'bout','Подтверждён после адаптации':'bconfirm','Отказ заказчика':'br','Отказ':'brs','Отказался кандидат':'brs','Не пришел на интервью':'bnv','Не вышел на работу':'bvclosed','Не удалось связаться':'bvclosed','Недозвон':'bnedozvon','Перезвон':'bperezv'};
   return `<span class="badge ${m[s]||'bdef'}">${s}</span>`;
@@ -1144,7 +1159,7 @@ function openEdit(id){
 <div class="f2"><div class="fr"><label>ID</label><input value="${c.id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${c.added||''}"></div></div>
 <div class="fr"><label>ФИО</label><input id="fn" value="${c.name}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,c.vacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${c.source||''}"></div></div>
-<div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phone}"></div><div class="fr"><label>📧 Email</label><input id="femail" value="${c.email||''}"></div></div>
+<div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" value="${formatPhoneRu(phone)}" style="font-size:18px;font-weight:600;letter-spacing:0.03em;color:#1F3864;"></div><div class="fr"><label>📧 Email</label><input id="femail" value="${c.email||''}"></div></div>
 <div class="f2"><div class="fr"><label>Этап</label><select id="fst" onchange="CRM.autoFillNextStep(this.value,document.getElementById('fnd').value)">${selStage(c.stage)}</select></div><div class="fr"><label>Статус</label><select id="fsts" onchange="CRM.toggleRefuse(this,'editRefuse')">${sel(STATUSES,c.status)}</select></div></div>
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
