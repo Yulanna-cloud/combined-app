@@ -32,6 +32,24 @@ async function getZoomAccessToken() {
   return zoomTokenCache.token;
 }
 
+app.get('/api/zoom/status', async (req, res) => {
+  const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
+  const vars = {
+    ZOOM_ACCOUNT_ID: !!ZOOM_ACCOUNT_ID,
+    ZOOM_CLIENT_ID: !!ZOOM_CLIENT_ID,
+    ZOOM_CLIENT_SECRET: !!ZOOM_CLIENT_SECRET
+  };
+  if (!ZOOM_ACCOUNT_ID || !ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
+    return res.json({ ok: false, vars, message: 'Не все переменные окружения заданы на Render.' });
+  }
+  try {
+    await getZoomAccessToken();
+    res.json({ ok: true, vars, message: '✅ Всё в порядке: переменные заданы, Zoom выдал токен доступа.' });
+  } catch (e) {
+    res.json({ ok: false, vars, message: '⚠️ Переменные заданы, но Zoom вернул ошибку: ' + e.message });
+  }
+});
+
 app.post('/api/zoom/create-meeting', async (req, res) => {
   try {
     const { topic, date, time, durationMinutes } = req.body || {};
