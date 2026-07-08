@@ -808,6 +808,24 @@ function archiveCandidate() {
   addToCRM(c.id, { status: 'Отказ' });
 }
 
+// Обратная синхронизация: CRM вызывает эту функцию, когда кандидату
+// проставляют отказной статус, чтобы кандидат ушёл в архив и в ассистенте
+// тоже (и пропал из списка активных слева). Работает только для кандидатов,
+// заведённых в CRM ПОСЛЕ этого обновления (у них сохраняется id ассистента —
+// hrId); для более старых записей связи нет, ничего не делаем.
+function archiveFromCRM(hrId, reason) {
+  if (!hrId) return;
+  const c = state.candidates.find(x => x.id === hrId);
+  if (!c || c.archived) return;
+  c.archived = true;
+  c.rejected = true;
+  c.verdict = 'red';
+  c.archivedAt = new Date().toLocaleDateString('ru-RU');
+  if (reason) c.crmRefuseReason = reason;
+  save();
+  renderCandidates();
+}
+
 function toggleArchiveView() {
   _showingArchive = !_showingArchive;
   const label = document.getElementById('archive-toggle-label');
@@ -1183,7 +1201,7 @@ function quickAddToCRM(initialStatus) {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ hrId: id, name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', source: 'HeadHunter' });
   switchView('crm');
   toast(initialStatus ? 'Заведён в CRM как «' + initialStatus + '», проверь и сохрани' : 'Кандидат сохранён, открываю CRM...');
 }
@@ -1226,7 +1244,7 @@ function addToCRM(candidateId, opts) {
   // Для отказа подставляем причину: из analysis, если не передана явно.
   const refuseReason = status === 'Отказ' ? (opts.refuseReason || guessRefuseReason(c.rawAnalysis)) : '';
 
-  CRM.addCandidateFromHR({ name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ hrId: candidateId, name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
   switchView('crm');
   toast(status === 'Отказ' ? 'Заведён в CRM как «Отказ», проверь причину и сохрани' : 'Открываю CRM...');
 }
@@ -1842,6 +1860,7 @@ return {
   applyIncomingResume,
   applyLoaded,
   archiveCandidate,
+  archiveFromCRM,
   setCandidateSearch,
   buildPrompt,
   buildRating,
