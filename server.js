@@ -62,7 +62,7 @@ app.post('/api/zoom/create-meeting', async (req, res) => {
         topic: topic || 'Собеседование',
         type: 2, // запланированная встреча на конкретное время
         start_time: `${date}T${time}:00`,
-        duration: durationMinutes || 30,
+        duration: durationMinutes || 45,
         timezone: 'Asia/Yekaterinburg',
         settings: { join_before_host: false, waiting_room: true, approval_type: 2 }
       })
