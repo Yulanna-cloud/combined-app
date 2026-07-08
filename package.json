@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Combined HR-assistant + CRM app for EPS",
   "main": "server.js",
+  "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js"
   },
