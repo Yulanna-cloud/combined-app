@@ -597,7 +597,7 @@ async function createZoomMeeting(cand, slot) {
         topic: 'Интервью — ' + cand.name + (cand.vacancy ? ' — ' + cand.vacancy : ''),
         date: slot.dateRaw,
         time: slot.time,
-        durationMinutes: 30
+        durationMinutes: 45
       })
     });
     const data = await resp.json();
