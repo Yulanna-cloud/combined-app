@@ -1093,7 +1093,8 @@ function readTalentPoolFields(){
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
+  const hrIdVal=document.getElementById('fhrid')?.value||'';
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -1195,10 +1196,22 @@ function saveEdit(id){
     });
   }
   saveData();closeModal();render();
+  // Обратная синхронизация: если статус стал отказным и кандидат заведён из
+  // ассистента (есть hrId) — архивируем его и там же, чтобы не приходилось
+  // отказывать вручную в двух местах.
+  if(oldStatus!==newStatus && REFUSE_STATUSES.includes(newStatus) && c.hrId && typeof HR!=='undefined' && HR.archiveFromCRM){
+    HR.archiveFromCRM(c.hrId, c.refuseReason||'');
+  }
 }
 function saveEditThenHist(id){
   const c=D.candidates.find(x=>x.id===id);
-  if(c){c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();}
+  if(c){
+    const oldStatus=c.status||'';
+    c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();
+    if(oldStatus!==c.status && REFUSE_STATUSES.includes(c.status) && c.hrId && typeof HR!=='undefined' && HR.archiveFromCRM){
+      HR.archiveFromCRM(c.hrId, c.refuseReason||'');
+    }
+  }
   openHist(id);
 }
 // Показ/скрытие панели «Встреча / офис» в карточке — приглашение нужно не всегда
@@ -1235,7 +1248,7 @@ loadLocal();updateFCustSelect();updateFVSelect();renderFilterDropdowns();render(
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, refuseReason: refuseFromHR, source: sourceFromHR }) {
+function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, refuseReason: refuseFromHR, source: sourceFromHR }) {
   if (!nameFromHR) return;
   const initialStatus = (statusFromHR && STATUSES.includes(statusFromHR)) ? statusFromHR : 'В работе';
   const initialReason = (refuseFromHR && REFUSE_REASONS.includes(refuseFromHR)) ? refuseFromHR : '';
@@ -1283,6 +1296,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
   const phoneEsc = (phoneFromHR || '').replace(/"/g, '&quot;');
   const emailEsc = (emailFromHR || '').replace(/"/g, '&quot;');
   const sourceEsc = (sourceFromHR || 'HR-ассистент').replace(/"/g, '&quot;');
+  const hrIdEsc = (hrId || '').toString().replace(/"/g, '&quot;');
 
   document.getElementById('mdl').style.display = 'flex';
   document.getElementById('mdl').className = 'modal-bg';
@@ -1294,6 +1308,7 @@ function addCandidateFromHR({ name: nameFromHR, phone: phoneFromHR, email: email
 <div class="upload-area" onclick="document.getElementById('pdfInHR').click()">📄 Загрузить PDF резюме<input type="file" id="pdfInHR" accept=".pdf" style="display:none" onchange="CRM.parsePDF(event)"></div>
 <div class="section-title">Основные данные</div>
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
+<input type="hidden" id="fhrid" value="${hrIdEsc}">
 <div class="fr"><label>ФИО *</label><input id="fn" value="${nameEsc}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES, matchedVacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${sourceEsc}"></div></div>
 <div class="f2"><div class="fr"><label>📞 Телефон</label><input id="fphone" value="${phoneEsc}"></div><div class="fr"><label>📧 Email</label><input id="femail" value="${emailEsc}"></div></div>
