@@ -568,6 +568,34 @@ function copyText(text){
 
 // ── Слоты для встреч ─────────────────────────────────────────────
 const ZOOM_LINK='https://us05web.zoom.us/j/8208122054?pwd=SHAzL1kwTmcyYm1PdkdzNVNLNUZ6dz09';
+
+// Создаёt настоящую встречу в Zoom через бэкенд (Server-to-Server OAuth) на
+// дату/время конкретного слота. Возвращает {join_url, start_url} или null,
+// если Zoom не настроен / запрос не удался — тогда используется запасной
+// вариант ZOOM_LINK (постоянная комната), чтобы приглашение всё равно ушло.
+async function createZoomMeeting(cand, slot) {
+  try {
+    const resp = await fetch('/api/zoom/create-meeting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: 'Интервью — ' + cand.name + (cand.vacancy ? ' — ' + cand.vacancy : ''),
+        date: slot.dateRaw,
+        time: slot.time,
+        durationMinutes: 30
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) { console.error('Zoom create-meeting error:', data); return null; }
+    cand.zoomJoinUrl = data.join_url;
+    cand.zoomStartUrl = data.start_url;
+    saveData();
+    return data;
+  } catch (e) {
+    console.error('Zoom create-meeting failed:', e);
+    return null;
+  }
+}
 function getSlots(){try{return JSON.parse(localStorage.getItem('crm_slots')||'[]');}catch(e){return[];}}
 function saveSlots(slots){localStorage.setItem('crm_slots',JSON.stringify(slots));}
 
@@ -744,14 +772,17 @@ function openBookSlot(candidateId){
   modal('<h2>📅 Выбери время встречи</h2><p style="font-size:12px;color:#666;margin-bottom:12px">'+cand.name+'</p>'+rows+'<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button></div>');
 }
 
-function bookSlot(cid,si){
+async function bookSlot(cid,si){
   var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
   var all=getSlots();
   // si теперь реальный индекс в массиве
   var slot=all[si];if(!slot)return;
   all[si].taken=true;all[si].takenBy=cand.name;saveSlots(all);
   cand.nextDate=slot.dateRaw;cand.meetTime=slot.time;cand.next='Видео-интервью';
-  saveData();closeModal();render();openSendInvite(cid,slot);
+  saveData();closeModal();render();
+  modal('<h2>⏳ Создаю встречу в Zoom...</h2><p style="font-size:13px;color:#666;">Пара секунд.</p>');
+  var zm = await createZoomMeeting(cand, slot);
+  openSendInvite(cid,slot,zm);
 }
 
 function mskTime(timeStr){
@@ -760,14 +791,18 @@ function mskTime(timeStr){
   return String(h).padStart(2,'0')+':'+p[1]+' (МСК)';
 }
 
-function openSendInvite(cid,slot){
+function openSendInvite(cid,slot,zoomMeeting){
   var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
   var mt=mskTime(slot.time);
-  var text='Добрый день!\nПриглашаю Вас на видео-встречу по вакансии '+(cand.vacancy||'')+'\nДата и время: '+slot.date+' в '+mt+'\nСсылка-приглашение: '+ZOOM_LINK+'\n\nСообщите заранее, пожалуйста, если не сможете подключиться.';
+  var joinLink=(zoomMeeting&&zoomMeeting.join_url)||cand.zoomJoinUrl||ZOOM_LINK;
+  var startLink=(zoomMeeting&&zoomMeeting.start_url)||cand.zoomStartUrl||'';
+  var zoomWarning=(zoomMeeting===null)?'<div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#c62828;">⚠️ Не удалось создать встречу через Zoom API — подставлена постоянная ссылка-комната. Проверь переменные окружения Zoom на Render.</div>':'';
+  var startBox=startLink?'<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#e65100;">🔑 Твоя ссылка для входа как организатор (эта встреча, не постоянная комната):<br><a href="'+startLink+'" target="_blank" style="color:#e65100;font-weight:600;word-break:break-all;">'+startLink+'</a></div>':'';
+  var text='Добрый день!\nПриглашаю Вас на видео-встречу по вакансии '+(cand.vacancy||'')+'\nДата и время: '+slot.date+' в '+mt+'\nСсылка-приглашение: '+joinLink+'\n\nСообщите заранее, пожалуйста, если не сможете подключиться.';
   var phone=(cand.contacts||'').replace(/\D/g,'');
   var waLink='https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(text);
   var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
-  modal('<h2>📨 Отправить приглашение</h2><div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="_blank" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+  modal('<h2>📨 Отправить приглашение</h2>'+zoomWarning+startBox+'<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="_blank" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
     var b=document.getElementById('tgInvBtn');if(b)b.onclick=function(){copyText(document.getElementById('inviteText').innerText);window.open(tgLink,'_blank');};
     var cb=document.getElementById('copyInvBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('inviteText').innerText);};
