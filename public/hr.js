@@ -155,7 +155,9 @@ const DEFAULT_PROMPTS = {
 
 Проверяй не знания терминов, а способность применять опыт на практике.
 
-Если резюме содержит слабые места — интервью должно быть построено вокруг их проверки.`,
+Если резюме содержит слабые места — интервью должно быть построено вокруг их проверки.
+
+ОГРАНИЧЕНИЕ ОБЪЁМА: пиши компактно и по делу, без вступлений, повторов и общих фраз. Суммарно по всем блокам — не больше 900 слов. Урежь количество вопросов в блоках 3-8 (2-3 вопроса на блок вместо длинных списков), это важнее полноты.`,
 
   interview: `Ты опытный HR-аналитик. Разбираешь прошедшее интервью.
 
@@ -974,7 +976,7 @@ function buildPrompt(type) { return (state.prompts[type] || DEFAULT_PROMPTS[type
 
 // ── API ───────────────────────────────────────────────────────────
 let _apiBusy = false;
-async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
+async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens }) {
   if (!state.apiKey) { onError('Сначала укажи API ключ в разделе «Настройки»'); return; }
   // Защита от повторного нажатия: пока запрос идёт, второй клик не запускает
   // ещё один анализ (иначе — лишний расход токенов и путаница).
@@ -996,7 +998,7 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
         signal: controller.signal,
         body: JSON.stringify({
           model: state.model || 'claude-sonnet-4-6',
-          max_tokens: 4000,
+          max_tokens: maxTokens || 4000,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user }
@@ -1327,6 +1329,7 @@ function generateQuestions() {
     system: buildPrompt('questionsPortrait'),
     user: userBase,
     loadingEl: el,
+    maxTokens: 700,
     onSuccess: (portraitText) => {
       el.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Шаг 2/2: строю вопросы для интервью…</div>';
       const userStep2 = userBase + `\n\nПСИХОЛОГИЧЕСКИЙ ПОРТРЕТ И ПРИОРИТЕТНЫЕ МОТИВЫ ДЛЯ ЭТОЙ ВАКАНСИИ (уже определены заранее, используй как есть, не выводи заново):\n${portraitText}`;
@@ -1334,6 +1337,7 @@ function generateQuestions() {
         system: buildPrompt('questions'),
         user: userStep2,
         loadingEl: el,
+        maxTokens: 2200,
         onSuccess: (mainText) => {
           const fullText = 'БЛОК 0. ПСИХОЛОГИЧЕСКИЙ ПОРТРЕТ И ПРИОРИТЕТНЫЕ МОТИВЫ\n\n' + portraitText + '\n\n' + mainText;
           c.questionsHTML = resultBox('Вопросы для интервью · ' + c.name, fullText);
