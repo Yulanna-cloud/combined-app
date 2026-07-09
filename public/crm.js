@@ -872,14 +872,23 @@ function openFreeMessage(cid){
     '<div id="freeMsgEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div>'+
     '<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
-    var wb=document.getElementById('msgWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('freeMsgText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
-    var tb=document.getElementById('msgTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('freeMsgText').value);window.open(tgLink,'_blank');};
-    var cb=document.getElementById('copyMsgBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('freeMsgText').value);};
+    var wb=document.getElementById('msgWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('freeMsgText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');logFreeMessage(cand,t,'WhatsApp');};
+    var tb=document.getElementById('msgTgBtn');if(tb)tb.onclick=function(){var t=document.getElementById('freeMsgText').value;copyText(t);window.open(tgLink,'_blank');logFreeMessage(cand,t,'Telegram');};
+    var cb=document.getElementById('copyMsgBtn1');if(cb)cb.onclick=function(){var t=document.getElementById('freeMsgText').value;copyText(t);logFreeMessage(cand,t,'скопировано');};
     var eb=document.getElementById('msgEmailBtn');if(eb)eb.onclick=function(){
       var subject='Сообщение от рекрутера — '+(cand.vacancy||'');
       emailInvite(cand.id, document.getElementById('freeMsgText').value, subject, 'freeMsgEmailStatus');
     };
   },100);
+}
+
+// Записывает факт отправки свободного сообщения в историю кандидата, чтобы
+// потом было видно в карточке (например «не дозвонилась, написала»).
+function logFreeMessage(cand, text, via){
+  var preview=(text||'').trim().replace(/\s+/g,' ').slice(0,120);
+  D.history.unshift({date:todayStr(),cid:cand.id,name:cand.name,vacancy:cand.vacancy||'',event:'Сообщение отправлено',desc:via+' · '+preview+(text.length>120?'…':''),result:'',resp:'Я'});
+  saveData();
+  renderHistory();
 }
 
 function openOfficeInvite(cid){
