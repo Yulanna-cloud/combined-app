@@ -1010,6 +1010,9 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens 
     }
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    _apiBusy = false; // снимаем блокировку ДО onSuccess — иначе цепочка вида
+                       // «второй запрос запускается прямо из onSuccess первого»
+                       // (как в generateQuestions) молча блокируется сама собой.
     onSuccess(data.choices[0].message.content);
   } catch(e) {
     const msg = e.name === 'AbortError'
@@ -1018,9 +1021,8 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens 
       ? 'Не удалось связаться с ИИ (проблема сети или неверный API-ключ). Проверь интернет и ключ в «Настройках» и попробуй снова.'
       : e.message;
     try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(_) {}
-    onError(msg);
-  } finally {
     _apiBusy = false;
+    onError(msg);
   }
 }
 
