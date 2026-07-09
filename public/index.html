@@ -245,6 +245,11 @@
           <div class="field"><label>Особый фокус для этого кандидата</label><textarea id="q-focus" rows="3" placeholder="Что особенно важно проверить?"></textarea></div>
           <button class="btn btn-primary btn-full" onclick="HR.generateQuestions()"><i class="ti ti-list"></i> Сгенерировать вопросы для интервью</button>
           <div id="questions-content"></div>
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border-light);">
+            <button class="btn btn-full" style="background:#fff3e0;color:#e65100;border-color:#ffcc80;" onclick="HR.generateMotivesForVacancy()"><i class="ti ti-target-arrow"></i> 🎯 Мотивы под вакансию</button>
+            <p class="field-hint">Коротко: какие мотивы (по методике Адессерман) важны для этой роли + несколько вопросов на их выявление.</p>
+            <div id="motives-vacancy-content"></div>
+          </div>
         </div>
         <div id="tab-chatanswers" style="display:none;">
           <div class="info-box info-blue">
