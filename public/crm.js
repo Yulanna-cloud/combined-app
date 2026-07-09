@@ -859,7 +859,9 @@ function releaseSlot(cid){
 // редактируемый, стартовое приветствие — просто заготовка.
 function openFreeMessage(cid){
   var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
-  var text='Добрый день, '+(cand.name?cand.name.split(' ')[0]:'')+'!\n\n';
+  var nameParts=(cand.name||'').trim().split(/\s+/);
+  var fname=nameParts[1]||nameParts[0]||'';
+  var text='Добрый день, '+fname+'!\n\n';
   var phone=(cand.contacts||'').replace(/\D/g,'');
   var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
   var emailBtnHtml='<button id="msgEmailBtn" class="btn btn-primary"'+(cand.email?'':' disabled')+' style="background:'+(cand.email?'#D32F2F':'#ccc')+';border-color:'+(cand.email?'#D32F2F':'#ccc')+';'+(cand.email?'':'cursor:not-allowed;')+'" title="'+(cand.email?('Отправить на '+cand.email):'У кандидата не указан email — добавь его в карточке кандидата')+'">📧 Email</button>';
