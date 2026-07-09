@@ -854,6 +854,32 @@ function releaseSlot(cid){
   setTimeout(function(){openBookSlot(cid);},300);
 }
 
+// Свободное сообщение кандидату — без привязки к встрече/офису. Для «не
+// смогла дозвониться», уточнений по вакансии и т.д. Текст полностью
+// редактируемый, стартовое приветствие — просто заготовка.
+function openFreeMessage(cid){
+  var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
+  var text='Добрый день, '+(cand.name?cand.name.split(' ')[0]:'')+'!\n\n';
+  var phone=(cand.contacts||'').replace(/\D/g,'');
+  var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
+  var emailBtnHtml='<button id="msgEmailBtn" class="btn btn-primary"'+(cand.email?'':' disabled')+' style="background:'+(cand.email?'#D32F2F':'#ccc')+';border-color:'+(cand.email?'#D32F2F':'#ccc')+';'+(cand.email?'':'cursor:not-allowed;')+'" title="'+(cand.email?('Отправить на '+cand.email):'У кандидата не указан email — добавь его в карточке кандидата')+'">📧 Email</button>';
+  modal('<h2>✉️ Написать '+(cand.name||'кандидату')+'</h2>'+
+    '<p style="font-size:12px;color:#666;margin-bottom:8px;">Свободный текст — например, «не смогла дозвониться», уточнение по вакансии, условия и т.д.</p>'+
+    '<textarea id="freeMsgText" style="width:100%;height:180px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;" placeholder="Введи текст сообщения...">'+text+'</textarea>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="msgTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="msgWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button>'+emailBtnHtml+'<button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyMsgBtn1">📋 Скопировать</button></div>'+
+    '<div id="freeMsgEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div>'+
+    '<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+  setTimeout(function(){
+    var wb=document.getElementById('msgWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('freeMsgText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
+    var tb=document.getElementById('msgTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('freeMsgText').value);window.open(tgLink,'_blank');};
+    var cb=document.getElementById('copyMsgBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('freeMsgText').value);};
+    var eb=document.getElementById('msgEmailBtn');if(eb)eb.onclick=function(){
+      var subject='Сообщение от рекрутера — '+(cand.vacancy||'');
+      emailInvite(cand.id, document.getElementById('freeMsgText').value, subject, 'freeMsgEmailStatus');
+    };
+  },100);
+}
+
 function openOfficeInvite(cid){
   var cand=D.candidates.find(function(x){return x.id===cid;});if(!cand)return;
   var dateStr='';
@@ -1189,6 +1215,7 @@ ${(()=>{
 </div>
 <div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
+<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openFreeMessage('${id}');},300)">✉️ Написать сообщение</button>
 <button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
 <button class="btn" style="color:#555;border-color:#ccc;" onclick="CRM.archiveCandidate('${id}')">🗄 Архив</button>
 <button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="CRM.deleteCandidate('${id}')">🗑 Удалить</button>
@@ -1459,6 +1486,7 @@ return {
   openManagersSettings,
   openOfficeInvite,
   openGDInvite,
+  openFreeMessage,
   openReport,
   openSendInvite,
   openSendInviteAgain,
