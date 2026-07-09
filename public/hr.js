@@ -986,23 +986,33 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError }) {
   try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
   toast('Анализирую…');
   try {
-    const resp = await fetch('https://apinet.cloud/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.apiKey}` },
-      body: JSON.stringify({
-        model: state.model || 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user }
-        ]
-      })
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // не ждём дольше 90 секунд
+    let resp;
+    try {
+      resp = await fetch('https://apinet.cloud/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.apiKey}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: state.model || 'claude-sonnet-4-6',
+          max_tokens: 4000,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ]
+        })
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     onSuccess(data.choices[0].message.content);
   } catch(e) {
-    const msg = /Failed to fetch|NetworkError|ERR_/i.test(e.message)
+    const msg = e.name === 'AbortError'
+      ? 'ИИ не ответил за 90 секунд (похоже на зависание сети или перегрузку сервиса). Попробуй ещё раз.'
+      : /Failed to fetch|NetworkError|ERR_/i.test(e.message)
       ? 'Не удалось связаться с ИИ (проблема сети или неверный API-ключ). Проверь интернет и ключ в «Настройках» и попробуй снова.'
       : e.message;
     try { loadingEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(_) {}
