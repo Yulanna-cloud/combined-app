@@ -572,6 +572,17 @@ document.getElementById('fV').addEventListener('input',renderTable);
 function closeModal(){document.getElementById('mdl').style.display='none';}
 function modal(html,wide){const m=document.getElementById('mdl');m.style.display='flex';m.className='modal-bg';m.innerHTML=`<div class="modal${wide?' modal-wide':''}">${html}</div>`;}
 document.getElementById('mdl').addEventListener('click',function(e){if(e.target===this)closeModal();});
+// Открывает карточку кандидата в CRM по id из ассистента (hrId). Используется
+// для кнопки «Открыть в CRM» на карточке кандидата в ассистенте — чтобы не
+// искать вручную в общем списке. Если кандидата с таким hrId в CRM ещё нет
+// (не был заведён после появления этой связи) — просто сообщает об этом.
+function openEditByHrId(hrId){
+  if(!hrId) return;
+  var c=D.candidates.find(function(x){return x.hrId===hrId;});
+  if(!c){ alert('Этот кандидат ещё не связан с записью в CRM (не заведён туда после обновления). Найди его вручную в списке или добавь заново через кнопку в ассистенте.'); return; }
+  openEdit(c.id);
+}
+
 function archiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;if(!confirm(`Архивировать ${c.name}?`))return;c.archived=true;saveData();closeModal();render();}
 function unarchiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;c.archived=false;saveData();render();}
 
@@ -1452,6 +1463,7 @@ return {
   applyStatusFilter,
   archiveAllInactive,
   archiveCandidate,
+  openEditByHrId,
   arrow,
   autoFillNextStep,
   bookSlot,
