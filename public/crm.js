@@ -1204,6 +1204,13 @@ function openEdit(id){
   const c=D.candidates.find(x=>x.id===id);if(!c)return;
   const phone=c.contacts&&c.contacts.match(/[\d\+]/)?c.contacts:'';
   modal(`<h2>✏️ ${c.name}</h2>
+<div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:14px;margin-bottom:14px;border-bottom:2px solid #eef1f5;">
+<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openFreeMessage('${id}');},300)">✉️ Написать сообщение</button>
+<span id="meetBtnsPlaceholder_${id}"></span>
+<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
+<button class="btn" style="background:#7e57c2;color:#fff;border-color:#7e57c2;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openGDInvite('${id}');},300)" title="Повторная встреча с генеральным директором">🔁 Повторная встреча с ГД</button>
+<button class="btn btn-primary" style="margin-left:auto;" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
+</div>
 <div class="f2"><div class="fr"><label>ID</label><input value="${c.id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${c.added||''}"></div></div>
 <div class="fr"><label>ФИО</label><input id="fn" value="${c.name}"></div>
 <div class="f2"><div class="fr"><label>Вакансия</label><select id="fv">${sel(VACANCIES,c.vacancy)}</select></div><div class="fr"><label>Источник</label><input id="fs" value="${c.source||''}"></div></div>
@@ -1212,38 +1219,29 @@ function openEdit(id){
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt" value="${c.meetTime||''}"></div><div class="fr"></div></div>
+<details style="margin-top:14px;">
+<summary style="cursor:pointer;font-size:12px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;padding:6px 0;">💬 Комментарий, кадровый резерв, рейтинг, теги</summary>
+<div style="margin-top:10px;">
 <div class="fr"><label>Комментарий</label><textarea id="fco">${c.comment||''}</textarea></div>
 ${talentPoolFieldsHtml(c)}
+</div>
+</details>
 ${(()=>{
   // Тот же человек мог подаваться на другие вакансии в прошлом — показываем как историю участия.
   const other=D.candidates.filter(x=>x.id!==c.id&&x.name.trim().toLowerCase()===c.name.trim().toLowerCase());
-  if(!other.length) return '';
-  const rows=other.map(x=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;font-size:12px;">'+(x.vacancy||'—')+'</td><td style="padding:6px 10px;font-size:12px;">'+(x.stage||'')+'</td><td style="padding:6px 10px;font-size:12px;">'+sbadge(x.status)+'</td><td style="padding:6px 10px;font-size:12px;color:#666;white-space:nowrap;">'+(x.added||'')+'</td></tr>').join('');
-  return '<hr style="margin:16px 0;border-color:#eee;"><div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">🔁 Участие в других вакансиях</div><div style="max-height:160px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+rows+'</tbody></table></div>';
-})()}
-${(()=>{
   const hist=D.history.filter(h=>h.cid===c.id).slice(0,15);
-  if(!hist.length) return '';
-  const rows=hist.map(h=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;white-space:nowrap;font-size:12px;color:#666;">'+h.date+'</td><td style="padding:6px 10px;font-size:12px;font-weight:600;">'+(h.event||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td><td style="padding:6px 10px;font-size:12px;color:#444;">'+(h.desc||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td></tr>').join('');
-  return '<hr style="margin:16px 0;border-color:#eee;"><div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📋 История кандидата</div><div style="max-height:180px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+rows+'</tbody></table></div>';
+  if(!other.length && !hist.length) return '';
+  const otherHtml=other.length?('<div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 8px;">🔁 Участие в других вакансиях</div><div style="max-height:160px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+other.map(x=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;font-size:12px;">'+(x.vacancy||'—')+'</td><td style="padding:6px 10px;font-size:12px;">'+(x.stage||'')+'</td><td style="padding:6px 10px;font-size:12px;">'+sbadge(x.status)+'</td><td style="padding:6px 10px;font-size:12px;color:#666;white-space:nowrap;">'+(x.added||'')+'</td></tr>').join('')+'</tbody></table></div>'):'';
+  const histHtml=hist.length?('<div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 8px;">📋 История кандидата</div><div style="max-height:180px;overflow-y:auto;border:1px solid #e8ecf0;border-radius:6px;"><table style="width:100%;border-collapse:collapse;"><tbody>'+hist.map(h=>'<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;white-space:nowrap;font-size:12px;color:#666;">'+h.date+'</td><td style="padding:6px 10px;font-size:12px;font-weight:600;">'+(h.event||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td><td style="padding:6px 10px;font-size:12px;color:#444;">'+(h.desc||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td></tr>').join('')+'</tbody></table></div>'):'';
+  return '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;padding:6px 0;">📋 История и другие вакансии</summary><div>'+otherHtml+histHtml+'</div></details>';
 })()}
-<div id="meetPanel_${id}" style="display:none;margin-top:12px;padding:12px;background:#f7f9fc;border:1px solid #e3e8ef;border-radius:8px;">
-<div style="font-size:11px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Встреча / приглашение</div>
-<div style="display:flex;gap:6px;flex-wrap:wrap;">
-<span id="meetBtnsPlaceholder_${id}"></span>
-<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openOfficeInvite('${id}');},300)">🏢 Пригласить в офис</button>
-<button class="btn" style="background:#7e57c2;color:#fff;border-color:#7e57c2;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openGDInvite('${id}');},300)" title="Повторная встреча с генеральным директором">🔁 Повторная встреча с ГД</button>
-</div>
-</div>
 <div class="mfoot" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-<button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEdit('${id}');setTimeout(function(){CRM.openFreeMessage('${id}');},300)">✉️ Написать сообщение</button>
 <button class="btn" style="color:#1565c0;border-color:#90caf9;background:#e3f2fd;" onclick="CRM.saveEditThenHist('${id}')">📋 Событие</button>
 <button class="btn" style="color:#555;border-color:#ccc;" onclick="CRM.archiveCandidate('${id}')">🗄 Архив</button>
 <button class="btn" style="color:#c62828;border-color:#ef9a9a;background:#fff5f5;" onclick="CRM.deleteCandidate('${id}')">🗑 Удалить</button>
 </div>
 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-<button class="btn" style="background:#ede7f6;color:#5e35b1;border-color:#b39ddb;" onclick="CRM.toggleMeetPanel('${id}')">🏢 Встреча / офис</button>
 <button class="btn" onclick="CRM.closeModal()">Отмена</button>
 <button class="btn btn-primary" onclick="CRM.saveEdit('${id}')">💾 Сохранить</button>
 </div>
