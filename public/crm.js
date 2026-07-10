@@ -826,11 +826,11 @@ function openSendInvite(cid,slot,zoomMeeting){
   var startBox=startLink?'<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#e65100;">🔑 Твоя ссылка для входа как организатор (эта встреча, не постоянная комната):<br><a href="'+startLink+'" target="_blank" style="color:#e65100;font-weight:600;word-break:break-all;">'+startLink+'</a></div>':'';
   var text='Добрый день!\nПриглашаю Вас на видео-встречу по вакансии '+(cand.vacancy||'')+'\nДата и время: '+slot.date+' в '+mt+'\nСсылка-приглашение: '+joinLink+'\n\nСообщите заранее, пожалуйста, если не сможете подключиться.';
   var phone=(cand.contacts||'').replace(/\D/g,'');
-  var waLink='https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(text);
+  var waLink='https://web.whatsapp.com/send?phone='+(phone||'')+'&text='+encodeURIComponent(text);
   var tgLink=phone?'https://t.me/+'+phone:'https://t.me/';
-  modal('<h2>📨 Отправить приглашение</h2>'+zoomWarning+startBox+'<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="_blank" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
+  modal('<h2>📨 Отправить приглашение</h2>'+zoomWarning+startBox+'<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px;margin-bottom:14px;"><strong>Текст:</strong><br><br><div id="inviteText" style="white-space:pre-wrap;font-size:12px;color:#333;line-height:1.7;">'+text.replace(/\n/g,'<br>')+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;"><button id="tgInvBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><a href="'+waLink+'" target="crm_whatsapp_tab" class="btn btn-primary" style="background:#25D366;border-color:#25D366;text-align:center;text-decoration:none;">💬 WhatsApp</a><button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyInvBtn1">📋 Скопировать</button></div><p style="font-size:11px;color:#888;">Telegram — скопирует текст и откроет чат. WhatsApp — текст вставится автоматически.</p><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
-    var b=document.getElementById('tgInvBtn');if(b)b.onclick=function(){copyText(document.getElementById('inviteText').innerText);window.open(tgLink,'_blank');};
+    var b=document.getElementById('tgInvBtn');if(b)b.onclick=function(){copyText(document.getElementById('inviteText').innerText);window.open(tgLink,'crm_telegram_tab');};
     var cb=document.getElementById('copyInvBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('inviteText').innerText);};
   },100);
 }
@@ -883,8 +883,8 @@ function openFreeMessage(cid){
     '<div id="freeMsgEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div>'+
     '<div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
-    var wb=document.getElementById('msgWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('freeMsgText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');logFreeMessage(cand,t,'WhatsApp');};
-    var tb=document.getElementById('msgTgBtn');if(tb)tb.onclick=function(){var t=document.getElementById('freeMsgText').value;copyText(t);window.open(tgLink,'_blank');logFreeMessage(cand,t,'Telegram');};
+    var wb=document.getElementById('msgWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('freeMsgText').value;window.open('https://web.whatsapp.com/send?phone='+(phone||'')+'&text='+encodeURIComponent(t),'crm_whatsapp_tab');logFreeMessage(cand,t,'WhatsApp');};
+    var tb=document.getElementById('msgTgBtn');if(tb)tb.onclick=function(){var t=document.getElementById('freeMsgText').value;copyText(t);window.open(tgLink,'crm_telegram_tab');logFreeMessage(cand,t,'Telegram');};
     var cb=document.getElementById('copyMsgBtn1');if(cb)cb.onclick=function(){var t=document.getElementById('freeMsgText').value;copyText(t);logFreeMessage(cand,t,'скопировано');};
     var eb=document.getElementById('msgEmailBtn');if(eb)eb.onclick=function(){
       var subject='Сообщение от рекрутера — '+(cand.vacancy||'');
@@ -926,8 +926,8 @@ function openOfficeInvite(cid){
     '<p style="font-size:12px;color:#666;margin-bottom:8px;">Отредактируй текст при необходимости.</p>'+
     '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button>'+emailBtnHtml+'<button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div id="offEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
-    var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
-    var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'_blank');};
+    var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://web.whatsapp.com/send?phone='+(phone||'')+'&text='+encodeURIComponent(t),'crm_whatsapp_tab');};
+    var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'crm_telegram_tab');};
     var cb=document.getElementById('copyOffBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('officeText').value);};
     var eb=document.getElementById('offEmailBtn');if(eb)eb.onclick=function(){
       var subject='Приглашение на встречу — вакансия '+(cand.vacancy||'');
@@ -961,8 +961,8 @@ function openGDInvite(cid){
     '<p style="font-size:12px;color:#666;margin-bottom:8px;">Отредактируй текст при необходимости.</p>'+
     '<textarea id="officeText" style="width:100%;height:220px;font-size:13px;line-height:1.7;border:1px solid #c8d4e8;border-radius:6px;padding:12px;resize:vertical;font-family:inherit;">'+text+'</textarea><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;"><button id="offTgBtn" class="btn btn-primary" style="background:#229ED9;border-color:#229ED9;">📱 Telegram</button><button id="offWaBtn" class="btn btn-primary" style="background:#25D366;border-color:#25D366;">💬 WhatsApp</button>'+emailBtnHtml+'<button class="btn btn-primary" style="background:#FF5C00;border-color:#FF5C00;" id="copyOffBtn1">📋 Скопировать</button></div><div id="offEmailStatus" style="font-size:12px;color:#888;margin-top:6px;"></div><div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Закрыть</button></div>');
   setTimeout(function(){
-    var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://wa.me/'+(phone||'')+'?text='+encodeURIComponent(t),'_blank');};
-    var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'_blank');};
+    var wb=document.getElementById('offWaBtn');if(wb)wb.onclick=function(){var t=document.getElementById('officeText').value;window.open('https://web.whatsapp.com/send?phone='+(phone||'')+'&text='+encodeURIComponent(t),'crm_whatsapp_tab');};
+    var tb=document.getElementById('offTgBtn');if(tb)tb.onclick=function(){copyText(document.getElementById('officeText').value);window.open(tgLink,'crm_telegram_tab');};
     var cb=document.getElementById('copyOffBtn1');if(cb)cb.onclick=function(){copyText(document.getElementById('officeText').value);};
     var eb=document.getElementById('offEmailBtn');if(eb)eb.onclick=function(){
       var subject='Приглашение на повторную встречу с генеральным директором';
