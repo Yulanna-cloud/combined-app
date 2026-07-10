@@ -617,11 +617,19 @@ function showPanel(name) {
         : '';
       return vacSelect +
         '<button class="btn" onclick="HR.resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
+        (cand && cand.addedToCrm ? '<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="HR.openInCRM(\'' + cand.id + '\')"><i class="ti ti-external-link"></i> Открыть в CRM</button>' : '') +
         (hasAnalysis ? '<button class="btn" style="background:#FF6B35;color:#fff;border-color:#FF6B35;" onclick="HR.archiveCandidate()"><i class="ti ti-x"></i> Отказ</button>' : '') +
         '<button class="btn btn-danger" onclick="HR.deleteCandidate()"><i class="ti ti-trash"></i> Удалить</button>';
     })();
   }
   renderCandidates();
+}
+
+// Открывает карточку этого же кандидата в CRM одним кликом — переключает
+// вкладку на CRM и находит нужную запись по hrId, без ручного поиска в списке.
+function openInCRM(candidateId) {
+  if (typeof switchView === 'function') switchView('crm');
+  setTimeout(() => { if (typeof CRM !== 'undefined' && CRM.openEditByHrId) CRM.openEditByHrId(candidateId); }, 150);
 }
 
 // ── Candidates ────────────────────────────────────────────────────
@@ -1831,6 +1839,7 @@ return {
   applyLoaded,
   archiveCandidate,
   archiveFromCRM,
+  openInCRM,
   setCandidateSearch,
   buildPrompt,
   buildRating,
