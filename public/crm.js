@@ -1219,10 +1219,10 @@ function openEdit(id){
 <div class="fr" id="editRefuse" style="${REFUSE_STATUSES.includes(c.status)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>`<option${r===c.refuseReason?' selected':''}>${r}</option>`).join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx" value="${c.next||''}"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" value="${c.nextDate||''}" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt" value="${c.meetTime||''}"></div><div class="fr"></div></div>
-<details style="margin-top:14px;">
-<summary style="cursor:pointer;font-size:12px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;padding:6px 0;">💬 Комментарий, кадровый резерв, рейтинг, теги</summary>
-<div style="margin-top:10px;">
 <div class="fr"><label>Комментарий</label><textarea id="fco">${c.comment||''}</textarea></div>
+<details style="margin-top:14px;">
+<summary style="cursor:pointer;font-size:12px;font-weight:700;color:#1F3864;text-transform:uppercase;letter-spacing:0.05em;padding:6px 0;">🗂 Кадровый резерв, рейтинг, теги</summary>
+<div style="margin-top:10px;">
 ${talentPoolFieldsHtml(c)}
 </div>
 </details>
