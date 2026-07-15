@@ -295,8 +295,23 @@ function loadFromSheets(){
     delete window[cbName];document.head.removeChild(script);
     if(res&&res.ok&&res.data){
       if(res.data.candidates){
-        const localMap={};D.candidates.forEach(c=>{if(c.archived)localMap[c.id]=true;});
-        D.candidates=res.data.candidates.map(c=>({...c,status:normalizeStatus(c.status),archived:localMap[c.id]||c.archived||false}));
+        // Не просто заменяем локальные данные серверными: если конкретного
+        // кандидата отредактировали локально ПОЗЖЕ, чем пришли данные из
+        // таблицы (например, фоновая синхронизация после сохранения ещё не
+        // долетела до Google Sheets к моменту перезагрузки страницы) —
+        // оставляем локальную версию, чтобы не потерять свежий статус/отказ.
+        const localMap={};D.candidates.forEach(c=>{localMap[c.id]=c;});
+        const sheetIds=new Set();
+        const merged=res.data.candidates.map(sc=>{
+          sheetIds.add(sc.id);
+          const loc=localMap[sc.id];
+          if(loc&&loc.updatedAt&&(!sc.updatedAt||loc.updatedAt>sc.updatedAt)) return loc;
+          return {...sc,status:normalizeStatus(sc.status),archived:(loc&&loc.archived)||sc.archived||false};
+        });
+        // Кандидаты, которых ещё нет в таблице (только что созданы локально,
+        // синхронизация не успела долететь) — не теряем их тоже.
+        Object.values(localMap).forEach(loc=>{ if(!sheetIds.has(loc.id)) merged.push(loc); });
+        D.candidates=merged;
       }
       if(res.data.history)D.history=res.data.history;
       if(res.data.config)applyCrmConfig(res.data.config);
@@ -583,8 +598,8 @@ function openEditByHrId(hrId){
   openEdit(c.id);
 }
 
-function archiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;if(!confirm(`Архивировать ${c.name}?`))return;c.archived=true;saveData();closeModal();render();}
-function unarchiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;c.archived=false;saveData();render();}
+function archiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;if(!confirm(`Архивировать ${c.name}?`))return;c.archived=true;c.updatedAt=Date.now();saveData();closeModal();render();}
+function unarchiveCandidate(id){const c=D.candidates.find(x=>x.id===id);if(!c)return;c.archived=false;c.updatedAt=Date.now();saveData();render();}
 
 // ── Вспомогательные функции ──────────────────────────────────────
 function copyText(text){
@@ -1192,7 +1207,7 @@ function readTalentPoolFields(){
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
   const hrIdVal=document.getElementById('fhrid')?.value||'';
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',...readTalentPoolFields()});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',updatedAt:Date.now(),...readTalentPoolFields()});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
@@ -1261,7 +1276,7 @@ function saveEdit(id){
   // Запоминаем старый этап и статус для истории
   const oldStage=c.stage||'';
   const oldStatus=c.status||'';
-  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';
+  c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.email=document.getElementById('femail')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.updatedAt=Date.now();
   if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;
   if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';
   if(document.getElementById('ftp'))Object.assign(c,readTalentPoolFields());
@@ -1304,7 +1319,7 @@ function saveEditThenHist(id){
   const c=D.candidates.find(x=>x.id===id);
   if(c){
     const oldStatus=c.status||'';
-    c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();
+    c.added=document.getElementById('fa')?.value||c.added;c.name=document.getElementById('fn')?.value.trim()||c.name;c.vacancy=document.getElementById('fv')?.value||c.vacancy;c.source=document.getElementById('fs')?.value||'';c.contacts=document.getElementById('fphone')?.value.trim()||'';c.stage=document.getElementById('fst')?.value||c.stage;c.status=document.getElementById('fsts')?.value||c.status;c.next=document.getElementById('fnx')?.value||'';c.nextDate=document.getElementById('fnd')?.value||'';c.comment=document.getElementById('fco')?.value||'';c.meetTime=document.getElementById('fmt')?.value||'';c.updatedAt=Date.now();if(document.getElementById('frr'))c.refuseReason=document.getElementById('frr').value;if(!REFUSE_STATUSES.includes(c.status))c.refuseReason='';saveData();
     if(oldStatus!==c.status && REFUSE_STATUSES.includes(c.status) && c.hrId && typeof HR!=='undefined' && HR.archiveFromCRM){
       HR.archiveFromCRM(c.hrId, c.refuseReason||'');
     }
