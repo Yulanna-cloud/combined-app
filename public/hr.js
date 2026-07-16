@@ -1,3 +1,4 @@
+
 const HR = (function() {
 // ── Default prompts ───────────────────────────────────────────────
 const DEFAULT_PROMPTS = {
@@ -267,6 +268,7 @@ function applyLoaded() {
   if (state.apiKey) document.getElementById('api-key').value = state.apiKey;
   if (state.model) document.getElementById('model-select').value = state.model;
   if (state.crmUrl) document.getElementById('crm-url').value = state.crmUrl;
+  if (state.calibrationNotes) document.getElementById('calibration-notes').value = state.calibrationNotes;
   document.getElementById('prompt-resume').value = state.prompts.resume;
   document.getElementById('prompt-questions').value = state.prompts.questions;
   document.getElementById('prompt-chatAnswers').value = state.prompts.chatAnswers;
@@ -893,6 +895,7 @@ function saveSettings() {
   state.apiKey = document.getElementById('api-key').value.trim();
   state.model = document.getElementById('model-select').value;
   state.crmUrl = document.getElementById('crm-url').value.trim();
+  state.calibrationNotes = document.getElementById('calibration-notes').value;
   save(); toast('Настройки сохранены');
 }
 
@@ -916,7 +919,16 @@ function vacancyContext() {
   return parts.join('\n\n');
 }
 
-function buildPrompt(type) { return (state.prompts[type] || DEFAULT_PROMPTS[type] || '').replace('{VACANCY}', vacancyContext()).replace('{MOTIVES}', MOTIVES_REFERENCE); }
+function buildPrompt(type) {
+  let p = (state.prompts[type] || DEFAULT_PROMPTS[type] || '').replace('{VACANCY}', vacancyContext()).replace('{MOTIVES}', MOTIVES_REFERENCE);
+  // Уроки из практики (несовпадения оценки ИИ с реальным решением директора и
+  // т.п.) подмешиваются туда, где принимается решение по кандидату, — чтобы
+  // ИИ со временем учитывал накопленные паттерны, а не только формальный опыт.
+  if ((type === 'resume' || type === 'chatAnswers') && state.calibrationNotes && state.calibrationNotes.trim()) {
+    p += '\n\n---\n\nУРОКИ ИЗ ПРОШЛЫХ РЕШЕНИЙ (заметки рекрутера о случаях, где реальное решение разошлось с ожиданиями, или другие важные паттерны — учитывай их, если они применимы к текущему кандидату, но не притягивай за уши, если явно не по теме):\n' + state.calibrationNotes.trim();
+  }
+  return p;
+}
 
 // ── API ───────────────────────────────────────────────────────────
 let _apiBusy = false;
