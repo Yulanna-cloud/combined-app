@@ -303,6 +303,27 @@ const ANALYTICS = (function () {
     });
   }
 
+  function normPhoneAn(s) { return (s || '').replace(/\D/g, ''); }
+  function normNameAn(s) { return (s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+  // Ищет кандидатов с одинаковым телефоном или ФИО в пределах одной вакансии —
+  // частая причина расхождения между числом откликов на HH и числом записей в CRM.
+  function reportDuplicates(pool) {
+    const groups = {};
+    pool.forEach(c => {
+      const vac = c.vacancy || '—';
+      const phone = normPhoneAn(c.contacts);
+      const name = normNameAn(c.name);
+      // Ключ группировки: телефон, если он есть и достаточно длинный (не пустышка),
+      // иначе — ФИО (менее надёжно, но лучше, чем ничего).
+      const key = phone && phone.length >= 10 ? 'p:' + phone : 'n:' + name;
+      const groupKey = vac + '||' + key;
+      if (!groups[groupKey]) groups[groupKey] = { vacancy: vac, items: [] };
+      groups[groupKey].items.push(c);
+    });
+    return Object.values(groups).filter(g => g.items.length > 1).sort((a, b) => b.items.length - a.items.length);
+  }
+
   function render() {
     const root = document.getElementById('analytics-content');
     if (!root) return;
@@ -410,6 +431,23 @@ const ANALYTICS = (function () {
       html += '</tbody></table>';
     } else {
       html += '<div class="an-empty" style="padding:10px 0;">Заполни источник/стоимость/отклики в HR-ассистенте — карточка вакансии → «Изменить»</div>';
+    }
+    html += '</div>';
+
+    // 8. Возможные дубли — одинаковый телефон/ФИО в пределах одной вакансии
+    const dupGroups = reportDuplicates(pool);
+    html += '<div class="an-section-title">🧩 Возможные дубли' + (dupGroups.length ? ' (' + dupGroups.length + ')' : '') + '</div><div class="an-card" style="overflow-x:auto;">';
+    if (dupGroups.length) {
+      html += '<p style="font-size:12px;color:#888;margin:0 0 10px;">Совпадение по телефону (или по ФИО, если телефон не заполнен) внутри одной вакансии. Проверь вручную в CRM — иногда это законный повторный отклик на переразмещённую вакансию, а не ошибка.</p>';
+      html += '<table class="an-table"><thead><tr><th>Вакансия</th><th>ФИО</th><th>Телефон</th><th>Статус</th><th>Добавлен</th><th>ID</th></tr></thead><tbody>';
+      dupGroups.forEach(g => {
+        g.items.forEach((c, i) => {
+          html += '<tr' + (i === 0 ? ' style="border-top:2px solid #d0d7e2;"' : '') + '><td>' + (i === 0 ? escHtml(g.vacancy) : '') + '</td><td>' + escHtml(c.name || '—') + '</td><td>' + escHtml(c.contacts || '—') + '</td><td>' + escHtml(c.status || '—') + '</td><td>' + (c.added ? fmtDate(c.added) : '—') + '</td><td style="color:#999;">' + escHtml(c.id || '') + '</td></tr>';
+        });
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<div class="an-empty" style="padding:10px 0;">Дублей по телефону/ФИО в выборке не найдено</div>';
     }
     html += '</div>';
 
