@@ -439,10 +439,10 @@ const ANALYTICS = (function () {
     html += '<div class="an-section-title">🧩 Возможные дубли' + (dupGroups.length ? ' (' + dupGroups.length + ')' : '') + '</div><div class="an-card" style="overflow-x:auto;">';
     if (dupGroups.length) {
       html += '<p style="font-size:12px;color:#888;margin:0 0 10px;">Совпадение по телефону (или по ФИО, если телефон не заполнен) внутри одной вакансии. Проверь вручную в CRM — иногда это законный повторный отклик на переразмещённую вакансию, а не ошибка.</p>';
-      html += '<table class="an-table"><thead><tr><th>Вакансия</th><th>ФИО</th><th>Телефон</th><th>Статус</th><th>Добавлен</th><th>ID</th></tr></thead><tbody>';
+      html += '<table class="an-table"><thead><tr><th>Вакансия</th><th>ФИО</th><th>Телефон</th><th>Статус</th><th>Добавлен</th><th>ID</th><th></th></tr></thead><tbody>';
       dupGroups.forEach(g => {
         g.items.forEach((c, i) => {
-          html += '<tr' + (i === 0 ? ' style="border-top:2px solid #d0d7e2;"' : '') + '><td>' + (i === 0 ? escHtml(g.vacancy) : '') + '</td><td>' + escHtml(c.name || '—') + '</td><td>' + escHtml(c.contacts || '—') + '</td><td>' + escHtml(c.status || '—') + '</td><td>' + (c.added ? fmtDate(c.added) : '—') + '</td><td style="color:#999;">' + escHtml(c.id || '') + '</td></tr>';
+          html += '<tr' + (i === 0 ? ' style="border-top:2px solid #d0d7e2;"' : '') + '><td>' + (i === 0 ? escHtml(g.vacancy) : '') + '</td><td>' + escHtml(c.name || '—') + '</td><td>' + escHtml(c.contacts || '—') + '</td><td>' + escHtml(c.status || '—') + '</td><td>' + (c.added ? fmtDate(c.added) : '—') + '</td><td style="color:#999;">' + escHtml(c.id || '') + '</td><td><button class="an-del-btn" data-del-id="' + escHtml(c.id || '') + '" data-del-name="' + escHtml(c.name || '') + '" style="background:#fff0f0;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">🗑 Удалить</button></td></tr>';
         });
       });
       html += '</tbody></table>';
@@ -453,6 +453,18 @@ const ANALYTICS = (function () {
 
     root.innerHTML = html;
     wireFilters();
+    // Кнопки удаления в отчёте «Возможные дубли» — используем ту же функцию
+    // удаления, что и в самой CRM (полностью убирает кандидата и его историю),
+    // затем просто перерисовываем аналитику заново.
+    root.querySelectorAll('.an-del-btn').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-del-id');
+        const name = btn.getAttribute('data-del-name');
+        if (typeof CRM === 'undefined' || !CRM.deleteCandidate) { alert('Не удалось найти функцию удаления CRM.'); return; }
+        CRM.deleteCandidate(id);
+        render();
+      };
+    });
   }
 
   return { render };
