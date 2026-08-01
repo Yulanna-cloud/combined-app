@@ -1206,9 +1206,23 @@ function readTalentPoolFields(){
 }
 function saveNew(){
   const name=document.getElementById('fn')?.value.trim();if(!name){alert('Введите ФИО');return;}
+  const vacPicked=document.getElementById('fv')?.value||VACANCIES[0];
+  const phoneDigitsNew=(document.getElementById('fphone')?.value||'').replace(/\D/g,'');
+  const nameNormNew=name.toLowerCase().replace(/\s+/g,' ');
+  const dupes=D.candidates.filter(c=>{
+    if((c.vacancy||'')!==vacPicked) return false;
+    const cPhone=(c.contacts||'').replace(/\D/g,'');
+    if(phoneDigitsNew&&phoneDigitsNew.length>=10&&cPhone===phoneDigitsNew) return true;
+    if((!phoneDigitsNew||phoneDigitsNew.length<10)&&(c.name||'').trim().toLowerCase().replace(/\s+/g,' ')===nameNormNew) return true;
+    return false;
+  });
+  if(dupes.length){
+    const list=dupes.map(c=>c.name+' ('+(c.status||'—')+', добавлен '+(c.added||'—')+')').join('; ');
+    if(!confirm('По вакансии «'+vacPicked+'» уже есть похожий кандидат: '+list+'.\n\nЭто может быть законный повторный отклик (переразмещённая вакансия) — тогда жми ОК, чтобы добавить как новую запись.\nЕсли это тот же человек — жми Отмена и найди существующую запись вместо повторного добавления.')) return;
+  }
   const hrIdVal=document.getElementById('fhrid')?.value||'';
-  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:document.getElementById('fv')?.value||VACANCIES[0],contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',updatedAt:Date.now(),...readTalentPoolFields()});
-  D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:document.getElementById('fv')?.value||'',event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
+  D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:vacPicked,contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',updatedAt:Date.now(),...readTalentPoolFields()});
+  D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:vacPicked,event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
   const newId = D.candidates[D.candidates.length-1].id;
@@ -1410,6 +1424,25 @@ function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email:
   const sourceEsc = (sourceFromHR || 'HR-ассистент').replace(/"/g, '&quot;');
   const hrIdEsc = (hrId || '').toString().replace(/"/g, '&quot;');
 
+  // Мягкая проверка на дубль: ищем в CRM кандидата с тем же телефоном (или
+  // ФИО, если телефона нет) по этой же вакансии. Не блокируем добавление —
+  // такое бывает законно (повторный отклик на переразмещённую вакансию),
+  // просто предупреждаем, чтобы не заводить одного и того же человека по
+  // невнимательности.
+  const phoneDigits = (phoneFromHR || '').replace(/\D/g, '');
+  const nameNorm = (nameFromHR || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const possibleDupes = D.candidates.filter(c => {
+    if ((c.vacancy || '') !== matchedVacancy) return false;
+    const cPhone = (c.contacts || '').replace(/\D/g, '');
+    if (phoneDigits && phoneDigits.length >= 10 && cPhone === phoneDigits) return true;
+    if ((!phoneDigits || phoneDigits.length < 10) && (c.name || '').trim().toLowerCase().replace(/\s+/g, ' ') === nameNorm) return true;
+    return false;
+  });
+  const escD = s => (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const dupeWarningHtml = possibleDupes.length
+    ? '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#e65100;">⚠️ По этой вакансии уже есть похожий кандидат: <b>' + possibleDupes.map(c => escD(c.name) + ' (' + escD(c.status || '—') + ', добавлен ' + escD(c.added || '—') + ')').join(', ') + '</b>. Если это правда новый отклик (например, повторное размещение вакансии) — просто сохрани как обычно. Если это тот же человек — лучше не добавлять повторно, а найти и открыть существующую запись в списке.</div>'
+    : '';
+
   document.getElementById('mdl').style.display = 'flex';
   document.getElementById('mdl').className = 'modal-bg';
   document.getElementById('mdl').innerHTML = `<div class="modal">
@@ -1417,6 +1450,7 @@ function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email:
 <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#2e7d32;display:flex;align-items:center;gap:8px;">
   ✅ Данные подгружены из HR-ассистента. Проверь и нажми «Добавить».
 </div>
+${dupeWarningHtml}
 <div class="upload-area" onclick="document.getElementById('pdfInHR').click()">📄 Загрузить PDF резюме<input type="file" id="pdfInHR" accept=".pdf" style="display:none" onchange="CRM.parsePDF(event)"></div>
 <div class="section-title">Основные данные</div>
 <div class="f2"><div class="fr"><label>ID</label><input id="fi" value="${id}" readonly></div><div class="fr"><label>Дата добавления</label><input type="date" id="fa" value="${todayStr()}"></div></div>
