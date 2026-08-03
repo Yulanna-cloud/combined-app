@@ -385,10 +385,10 @@ function migrateRefuseReason(s){
 }
 
 const STAGES=['Скрининг','Вопросы в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Повторная встреча с ГД','Оффер','Обучение','Работает'];
-const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Не удалось связаться','Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации'];
+const STATUSES=['В работе','Перенос собеседования','Недозвон','Перезвон','Не удалось связаться','Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу','Вакансия закрыта','Трудоустроен','Подтверждён после адаптации'];
 const EVENTS=['Добавлен кандидат','Вопросы отправлены в чат HH','Интервью HR назначено','Интервью HR проведено','Интервью заказчика назначено','Интервью заказчика проведено','Оффер отправлен','Оффер принят','Отказ кандидата','Отказ заказчика','Выход на работу'];
 const REFUSE_REASONS=['','Нерелевантный опыт','Низкая квалификация','Высокие зарплатные ожидания','Не подходит график','Не подходит локация','Контроффер','Передумал','Не прошел интервью заказчика','Другое'];
-const INACTIVE=['Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу','Трудоустроен','Подтверждён после адаптации','Не удалось связаться'];
+const INACTIVE=['Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу','Вакансия закрыта','Трудоустроен','Подтверждён после адаптации','Не удалось связаться'];
 const REFUSE_STATUSES=['Отказался кандидат','Отказ заказчика','Отказ','Не пришел на интервью','Не вышел на работу'];
 // Уровень этапа = его индекс в STAGES — единая точка истины, чтобы добавление
 // нового этапа в список автоматически и безопасно сдвигало нумерацию везде,
@@ -465,7 +465,7 @@ function formatPhoneRu(raw){
 }
 
 function sbadge(s){
-  const m={'В работе':'bw','Перенос собеседования':'bpurple','Трудоустроен':'bout','Подтверждён после адаптации':'bconfirm','Отказ заказчика':'br','Отказ':'brs','Отказался кандидат':'brs','Не пришел на интервью':'bnv','Не вышел на работу':'bvclosed','Не удалось связаться':'bvclosed','Недозвон':'bnedozvon','Перезвон':'bperezv'};
+  const m={'В работе':'bw','Перенос собеседования':'bpurple','Трудоустроен':'bout','Подтверждён после адаптации':'bconfirm','Отказ заказчика':'br','Отказ':'brs','Отказался кандидат':'brs','Не пришел на интервью':'bnv','Не вышел на работу':'bvclosed','Вакансия закрыта':'bvclosed','Не удалось связаться':'bvclosed','Недозвон':'bnedozvon','Перезвон':'bperezv'};
   return `<span class="badge ${m[s]||'bdef'}">${s}</span>`;
 }
 function dlabel(ds){const d=parseDate(ds);if(!d)return '';const today=new Date();today.setHours(0,0,0,0);d.setHours(0,0,0,0);const diff=Math.round((d-today)/86400000);const cls=diff<0?'dr':diff===0?'dy':'dg';return `<span class="dot ${cls}"></span>${d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})}`;}
@@ -1020,7 +1020,7 @@ function emailInvite(cid, body, subject, statusElId){
 
 // ── Закрыть вакансию ─────────────────────────────────────────────
 function openCloseVacancy(){
-  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Вакансия получит статус «Закрыта», все активные кандидаты по ней — статус «Не вышел на работу» и будут заархивированы.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="CRM.closeVacancy()">🔒 Закрыть вакансию</button></div>');
+  modal('<h2>🔒 Закрыть вакансию</h2><p style="font-size:13px;color:#666;margin-bottom:16px">Вакансия получит статус «Закрыта», все активные кандидаты по ней получат статус «Вакансия закрыта» — это не отказ и не влияет на счётчик отказов, просто уходят из списка активных. Ничего не удаляется, их всегда можно найти без фильтра «Активные» и вернуть в работу.</p><div class="fr"><label>Вакансия</label><select id="closeVacSel">'+VACANCIES.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select></div><div id="closeVacCount" style="font-size:13px;color:#888;margin-bottom:12px;padding:8px;background:#f5f5f5;border-radius:6px;"></div><div class="mfoot" style="justify-content:space-between"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn" style="background:#546E7A;color:#fff;" onclick="CRM.closeVacancy()">🔒 Закрыть вакансию</button></div>');
   var sel=document.getElementById('closeVacSel');
   function upd(){var v=sel.value,a=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===v;}).length,t=D.candidates.filter(function(c){return c.vacancy===v;}).length;var el=document.getElementById('closeVacCount');if(el)el.textContent='Активных: '+a+' из '+t;}
   sel.addEventListener('change',upd);upd();
@@ -1031,8 +1031,8 @@ function closeVacancy(){
   var active=D.candidates.filter(function(c){return !c.archived&&!INACTIVE.includes(c.status)&&c.vacancy===vac;});
   // Кандидаты НЕ архивируются при закрытии вакансии — они остаются в общей базе
   // и доступны для кадрового резерва на будущие вакансии.
-  if(!confirm('Закрыть «'+vac+'»?'+(active.length?' '+active.length+' активных кандидатов получат статус «Не вышел на работу», но останутся в базе.':'')))return;
-  active.forEach(function(c){c.status='Не вышел на работу';});
+  if(!confirm('Закрыть «'+vac+'»?'+(active.length?' '+active.length+' активных кандидатов получат статус «Вакансия закрыта», но останутся в базе.':'')))return;
+  active.forEach(function(c){c.status='Вакансия закрыта';});
   setVacMeta(vac,'status','Закрыта');
   setVacMeta(vac,'closedDate',todayStr());
   D.history.push({date:todayStr(),cid:'',name:'Вакансия: '+vac,vacancy:vac,event:'Вакансия закрыта',desc:'Закрыто, кандидатов в работе: '+active.length,result:'',resp:'Я'});
