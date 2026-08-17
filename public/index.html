@@ -257,7 +257,10 @@
             <span>Вставь ответы кандидата из чата HH.ru на уточняющие вопросы — ИИ даст короткий вердикт (звать/не звать), используя уже готовый анализ резюме, без повторного разбора резюме целиком. Это дешевле по токенам.</span>
           </div>
           <div class="field"><label>Ответы кандидата из чата HH</label><textarea id="ca-answers" rows="8" placeholder="Вставь сюда переписку или ответы кандидата..."></textarea></div>
-          <button class="btn btn-primary btn-full" onclick="HR.analyzeChatAnswers()"><i class="ti ti-sparkles"></i> Оценить ответы</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="flex:1;" onclick="HR.analyzeChatAnswers()"><i class="ti ti-sparkles"></i> Оценить ответы</button>
+            <button class="btn" style="flex:0 0 auto;" onclick="HR.saveChatAnswersOnly()" title="Сохранить текст ответов без запуска ИИ — например, если анализ понадобится позже"><i class="ti ti-device-floppy"></i> Сохранить без анализа</button>
+          </div>
           <div id="chatanswers-content"></div>
         </div>
         <div id="tab-compare" style="display:none;">
