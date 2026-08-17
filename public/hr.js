@@ -1338,6 +1338,20 @@ function generateMotivesForVacancy() {
 // Дешёвая по токенам проверка: отправляем уже готовый анализ резюме
 // (не само резюме целиком) + ответы кандидата из чата HH — и просим
 // короткий вердикт "звать/не звать", без повторного полного разбора.
+// Сохраняет ответы кандидата из чата HH без запуска ИИ-анализа — например,
+// когда возвращаешься к старому кандидату позже и анализ пока не нужен, но
+// сам текст ответов терять не хочется (раньше он сохранялся только вместе
+// с успешным анализом).
+function saveChatAnswersOnly() {
+  const c = currentCandidate(); if (!c) return;
+  const answers = document.getElementById('ca-answers').value.trim();
+  if (!answers) { alert('Вставь ответы кандидата из чата HH'); return; }
+  c.chatAnswers = answers;
+  save(); renderCandidates();
+  syncToSheets();
+  toast('Ответы сохранены (без анализа)');
+}
+
 function analyzeChatAnswers() {
   const c = currentCandidate(); if (!c) return;
   const answers = document.getElementById('ca-answers').value.trim();
@@ -1859,6 +1873,7 @@ return {
   parsePDF,
   saveRawResume,
   analyzeChatAnswers,
+  saveChatAnswersOnly,
   analyzeInterview,
   analyzeResume,
   applyIncomingResume,
