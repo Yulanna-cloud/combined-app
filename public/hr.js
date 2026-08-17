@@ -1,4 +1,3 @@
-
 const HR = (function() {
 // ── Default prompts ───────────────────────────────────────────────
 const DEFAULT_PROMPTS = {
@@ -617,7 +616,10 @@ function showPanel(name) {
       const vacSelect = state.vacancies.length > 1
         ? '<select class="btn" style="max-width:220px;" title="Перевести кандидата на другую вакансию" onchange="HR.changeVacancyFromCard(this)">' + vacOpts + '</select>'
         : '';
-      return vacSelect +
+      const archivedBadge = cand && cand.archived && cand.archivedAt
+        ? '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#ffebee;color:#c62828;border-radius:6px;font-size:13px;font-weight:600;">🔴 Отказ от ' + escHtml(cand.archivedAt) + '</span>'
+        : '';
+      return archivedBadge + vacSelect +
         '<button class="btn" onclick="HR.resetAnalysis()"><i class="ti ti-refresh"></i> Обновить анализ</button>' +
         (cand && cand.addedToCrm ? '<button class="btn" style="background:#5c6bc0;color:#fff;border-color:#5c6bc0;" onclick="HR.openInCRM(\'' + cand.id + '\')"><i class="ti ti-external-link"></i> Открыть в CRM</button>' : '') +
         (hasAnalysis ? '<button class="btn" style="background:#FF6B35;color:#fff;border-color:#FF6B35;" onclick="HR.archiveCandidate()"><i class="ti ti-x"></i> Отказ</button>' : '') +
@@ -1209,8 +1211,20 @@ function addToCRM(candidateId, opts) {
   const status = opts.status || '';
   // Для отказа подставляем причину: из analysis, если не передана явно.
   const refuseReason = status === 'Отказ' ? (opts.refuseReason || guessRefuseReason(c.rawAnalysis)) : '';
+  const vacTitle = v ? v.title : '';
 
-  CRM.addCandidateFromHR({ hrId: candidateId, name: c.name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
+  // Сначала пробуем найти уже существующую запись в CRM (например, кандидат
+  // был заведён туда раньше для подсчёта воронки) и просто обновить статус в
+  // ней — без этого каждый повторный «Отказ» создавал бы вторую карточку.
+  if (status && typeof CRM !== 'undefined' && CRM.updateStatusByMatch) {
+    const updatedId = CRM.updateStatusByMatch({ hrId: candidateId, name: c.name, phone, vacancy: vacTitle, status, refuseReason });
+    if (updatedId) {
+      toast('Статус «' + status + '» проставлен в существующей карточке CRM (не дублируем)');
+      return;
+    }
+  }
+
+  CRM.addCandidateFromHR({ hrId: candidateId, name: c.name, phone, email, vacancy: vacTitle, customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
   switchView('crm');
   toast(status === 'Отказ' ? 'Заведён в CRM как «Отказ», проверь причину и сохрани' : 'Открываю CRM...');
 }
