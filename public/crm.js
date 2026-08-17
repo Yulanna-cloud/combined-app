@@ -1293,12 +1293,13 @@ ${(()=>{
 function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason }) {
   const phoneDigits = (phone || '').replace(/\D/g, '');
   const nameNorm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const vacNorm = (vacancy || '').trim().toLowerCase();
   let c = hrId ? D.candidates.find(x => x.hrId === hrId) : null;
   if (!c && phoneDigits && phoneDigits.length >= 10) {
-    c = D.candidates.find(x => (x.vacancy || '') === (vacancy || '') && (x.contacts || '').replace(/\D/g, '') === phoneDigits);
+    c = D.candidates.find(x => (x.vacancy || '').trim().toLowerCase() === vacNorm && (x.contacts || '').replace(/\D/g, '') === phoneDigits);
   }
   if (!c && nameNorm) {
-    c = D.candidates.find(x => (x.vacancy || '') === (vacancy || '') && (x.name || '').trim().toLowerCase().replace(/\s+/g, ' ') === nameNorm);
+    c = D.candidates.find(x => (x.vacancy || '').trim().toLowerCase() === vacNorm && (x.name || '').trim().toLowerCase().replace(/\s+/g, ' ') === nameNorm);
   }
   if (!c) return null;
   c.status = status;
