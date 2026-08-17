@@ -1285,6 +1285,31 @@ ${(()=>{
       :'<button class="btn" style="background:#1976d2;color:#fff;border-color:#1976d2;font-weight:700;" onclick="CRM.openBookSlot(\''+id+'\')">📅 Назначить встречу</button>';
   },80);
 }
+// Ищет уже существующего кандидата в CRM (сначала по hrId, затем по телефону
+// в пределах той же вакансии, затем по ФИО) и, если находит, проставляет ему
+// статус/причину отказа прямо там — без создания второй карточки. Возвращает
+// id обновлённого кандидата или null, если подходящего не нашлось (тогда
+// вызывающий код должен создать новую запись как обычно).
+function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason }) {
+  const phoneDigits = (phone || '').replace(/\D/g, '');
+  const nameNorm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  let c = hrId ? D.candidates.find(x => x.hrId === hrId) : null;
+  if (!c && phoneDigits && phoneDigits.length >= 10) {
+    c = D.candidates.find(x => (x.vacancy || '') === (vacancy || '') && (x.contacts || '').replace(/\D/g, '') === phoneDigits);
+  }
+  if (!c && nameNorm) {
+    c = D.candidates.find(x => (x.vacancy || '') === (vacancy || '') && (x.name || '').trim().toLowerCase().replace(/\s+/g, ' ') === nameNorm);
+  }
+  if (!c) return null;
+  c.status = status;
+  if (refuseReason !== undefined) c.refuseReason = refuseReason;
+  if (hrId && !c.hrId) c.hrId = hrId; // подтягиваем связь, если её раньше не было
+  c.updatedAt = Date.now();
+  D.history.unshift({ date: todayStr(), cid: c.id, name: c.name, vacancy: c.vacancy || '', event: status, desc: 'Отказ проставлен из HR-ассистента', result: '', resp: 'Я' });
+  saveData();
+  return c.id;
+}
+
 function saveEdit(id){
   const c=D.candidates.find(x=>x.id===id);if(!c)return;
   // Запоминаем старый этап и статус для истории
@@ -1511,6 +1536,7 @@ return {
   archiveAllInactive,
   archiveCandidate,
   openEditByHrId,
+  updateStatusByMatch,
   arrow,
   autoFillNextStep,
   bookSlot,
