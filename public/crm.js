@@ -32,7 +32,7 @@ const COLOR_PRESETS=[
 ];
 let VAC_META=JSON.parse(localStorage.getItem('crm_vac_meta')||'{}');
 function saveVacancies(){localStorage.setItem('crm_vacancies',JSON.stringify(VACANCIES));localStorage.setItem('crm_vac_colors',JSON.stringify(VAC_COLORS));localStorage.setItem('crm_vac_meta',JSON.stringify(VAC_META));}
-function getVacMeta(vac){return VAC_META[vac]||{hhLink:'',siteUrl:'',customerId:'',status:'В работе',openedDate:'',closedDate:'',planHires:''};}
+function getVacMeta(vac){return VAC_META[vac]||{hhLink:'',siteUrl:'',customerId:'',status:'В работе',openedDate:'',closedDate:'',planHires:'',costTotal:''};}
 function setVacMeta(vac,field,val){if(!VAC_META[vac])VAC_META[vac]={};VAC_META[vac][field]=val;saveVacancies();}
 
 // ── Заказчики ─────────────────────────────────────────────────────
@@ -227,6 +227,8 @@ function renderVacList(){
 <input type="date" class="vac-meta-input" data-vac="${v}" data-field="openedDate" value="${meta.openedDate}" style="flex:1;min-width:120px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
 <span style="font-size:11px;color:#888;white-space:nowrap;">Закрыта:</span>
 <input type="date" class="vac-meta-input" data-vac="${v}" data-field="closedDate" value="${meta.closedDate}" style="flex:1;min-width:120px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
+<span style="font-size:11px;color:#888;white-space:nowrap;">Стоимость размещения, ₽:</span>
+<input type="number" min="0" placeholder="0" class="vac-meta-input" data-vac="${v}" data-field="costTotal" value="${meta.costTotal||''}" style="width:110px;font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;">
 </div>
 </div>`;
   }).join('');
