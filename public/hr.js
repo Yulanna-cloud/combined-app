@@ -433,6 +433,32 @@ function saveVacancy() {
   save(); renderVacancySelect(); renderCandidates(); toast('Вакансия сохранена');
 }
 
+// Дублирует текущую вакансию под новым названием — с тем же описанием,
+// требованиями, компанией и промтом (они не меняются от переразмещения), но
+// с чистыми полями публикации (дата, стоимость, отклики) — их вписываешь
+// заново под новую публикацию. Полезно, когда вакансию закрыли, а потом
+// открыли снова: не приходится пересоздавать описание с нуля, и в CRM новые
+// кандидаты сразу попадут в отдельную (новую) вакансию, а не смешаются со
+// старой при подсчёте аналитики.
+function duplicateVacancy() {
+  const v = currentVacancy(); if (!v) return;
+  const suggested = v.title + ' (' + new Date().toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' }) + ')';
+  const newTitle = prompt('Название новой вакансии (важно: используй ЭТО ЖЕ название при добавлении кандидатов в CRM через расширение, чтобы аналитика не смешивалась со старой публикацией):', suggested);
+  if (!newTitle || !newTitle.trim()) return;
+  const title = newTitle.trim();
+  if (state.vacancies.some(x => x.title === title)) { alert('Вакансия с таким названием уже есть'); return; }
+  const id = 'v_' + Date.now();
+  state.vacancies.push({
+    id, title, desc: v.desc, companyId: v.companyId, company: v.company, site: v.site, notes: v.notes,
+    pubSource: v.pubSource || '', pubCost: '', pubOpened: '', pubClosed: '', pubResponses: ''
+  });
+  state.currentVacancyId = id;
+  save(); renderVacancySelect(); fillVacancyForm();
+  showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + title;
+  renderCandidates();
+  toast('Вакансия продублирована — заполни новые дату публикации, источник и стоимость');
+}
+
 function newVacancy() {
   document.getElementById('modal-vac-name').value = '';
   document.getElementById('modal-new-vacancy').classList.add('open');
@@ -1927,6 +1953,7 @@ return {
   loadFromSheets,
   loadPDFJS,
   newVacancy,
+  duplicateVacancy,
   onDragLeave,
   onDragOver,
   onDrop,
