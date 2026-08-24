@@ -783,7 +783,7 @@ function archiveCandidate() {
   c.archived = true;
   c.rejected = true;
   c.verdict = 'red';
-  c.archivedAt = new Date().toLocaleDateString('ru-RU');
+  c.archivedAt = new Date().toLocaleDateString('ru-RU'); c.updatedAt = Date.now();
   state.currentCandidateId = null;
   save();
   renderCandidates();
@@ -803,7 +803,7 @@ function archiveFromCRM(hrId, reason) {
   c.archived = true;
   c.rejected = true;
   c.verdict = 'red';
-  c.archivedAt = new Date().toLocaleDateString('ru-RU');
+  c.archivedAt = new Date().toLocaleDateString('ru-RU'); c.updatedAt = Date.now();
   if (reason) c.crmRefuseReason = reason;
   save();
   renderCandidates();
@@ -1198,7 +1198,7 @@ function quickAddToCRM(initialStatus) {
   const isReject = initialStatus === 'Отказ';
   const id = 'c_' + Date.now();
   const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: isReject, archivedAt: isReject ? date : undefined, rejected: isReject, resumeHTML: '', rawAnalysis: '', verdict: isReject ? 'red' : '', hasQuestions: false, interviewDone: false, addedToCrm: true });
+  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: isReject, archivedAt: isReject ? date : undefined, rejected: isReject, resumeHTML: '', rawAnalysis: '', verdict: isReject ? 'red' : '', hasQuestions: false, interviewDone: false, addedToCrm: true, updatedAt: Date.now() });
   state.currentCandidateId = id;
   save();
   renderCandidates();
@@ -1273,7 +1273,7 @@ function rejectToCRM(candidateId) {
   if (c) {
     c.rejected = true;
     c.archived = true;
-    c.archivedAt = new Date().toLocaleDateString('ru-RU');
+    c.archivedAt = new Date().toLocaleDateString('ru-RU'); c.updatedAt = Date.now();
     if (!c.verdict) c.verdict = 'red';
   }
   addToCRM(candidateId, { status: 'Отказ' });
@@ -1760,7 +1760,26 @@ function loadFromSheets() {
     document.head.removeChild(script);
     if (res && res.ok && res.data) {
       const d = res.data;
-      if (d.candidates && d.candidates.length) state.candidates = decodeFromSheets(d.candidates);
+      if (d.candidates && d.candidates.length) {
+        // Не заменяем локальные данные вслепую: если конкретного кандидата
+        // отредактировали локально ПОЗЖЕ, чем пришли данные из таблицы
+        // (например, фоновая синхронизация после отказа/архивации ещё не
+        // долетела до Google Sheets к моменту этой загрузки) — оставляем
+        // локальную версию, чтобы не терять свежие изменения.
+        const incoming = decodeFromSheets(d.candidates);
+        const localMap = {}; state.candidates.forEach(c => { localMap[c.id] = c; });
+        const seenIds = new Set();
+        const merged = incoming.map(sc => {
+          seenIds.add(sc.id);
+          const loc = localMap[sc.id];
+          if (loc && loc.updatedAt && (!sc.updatedAt || loc.updatedAt > sc.updatedAt)) return loc;
+          return sc;
+        });
+        // Кандидаты, которых ещё нет в таблице (только что созданы локально,
+        // синхронизация не успела долететь) — не теряем их тоже.
+        Object.values(localMap).forEach(loc => { if (!seenIds.has(loc.id)) merged.push(loc); });
+        state.candidates = merged;
+      }
       if (d.companies && d.companies.length) state.companies = d.companies;
       if (d.vacancies && d.vacancies.length) state.vacancies = d.vacancies;
       if (d.prompts && Object.keys(d.prompts).length) state.prompts = { ...state.prompts, ...d.prompts };
