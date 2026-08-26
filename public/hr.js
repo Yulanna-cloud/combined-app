@@ -730,8 +730,12 @@ function openCandidate(id) {
   document.getElementById('chatanswers-content').innerHTML = c.chatAnswersHTML || '';
   document.getElementById('i-transcript').value = c.transcript || '';
   document.getElementById('interview-content').innerHTML = c.interviewHTML || '';
-  document.getElementById('resume-content').innerHTML = c.resumeHTML ||
-    '<div class="empty"><i class="ti ti-file-text"></i><p>Анализ резюме ещё не проводился</p></div>';
+  document.getElementById('resume-content').innerHTML = c.resumeHTML || `
+<div class="empty" style="margin-bottom:16px;"><i class="ti ti-file-text"></i><p>Анализ резюме ещё не проводился</p></div>
+<button class="btn btn-primary btn-full" style="margin-bottom:14px;" onclick="HR.reAnalyzeCandidate()">
+<i class="ti ti-sparkles"></i> Проанализировать резюме
+</button>
+${crmExportBox(c.id)}`;
   // Показываем кнопку копирования для активной вкладки
   setTimeout(() => updateCopyBtn('resume'), 100);
 }
