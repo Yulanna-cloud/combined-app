@@ -74,6 +74,12 @@
       <button class="add-cand-btn" onclick="HR.toggleArchiveView()" id="archive-toggle-btn" style="background:transparent;color:var(--text3);border:1px solid var(--border-med);font-size:11px;margin-top:4px;">
         <i class="ti ti-archive"></i> <span id="archive-toggle-label">Архив отказов</span>
       </button>
+      <div id="archive-filters" style="display:none;gap:4px;margin-top:6px;flex-wrap:wrap;">
+        <button class="archive-filter-btn active" data-filter="all" onclick="HR.setArchiveFilter('all')" style="flex:1;min-width:56px;padding:4px 6px;font-size:10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;">Все</button>
+        <button class="archive-filter-btn" data-filter="today" onclick="HR.setArchiveFilter('today')" style="flex:1;min-width:56px;padding:4px 6px;font-size:10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Сегодня</button>
+        <button class="archive-filter-btn" data-filter="yesterday" onclick="HR.setArchiveFilter('yesterday')" style="flex:1;min-width:56px;padding:4px 6px;font-size:10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Вчера</button>
+        <button class="archive-filter-btn" data-filter="week" onclick="HR.setArchiveFilter('week')" style="flex:1;min-width:56px;padding:4px 6px;font-size:10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;">Неделя</button>
+      </div>
     </div>
   </div>
 
