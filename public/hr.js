@@ -684,6 +684,11 @@ function currentCandidate() { return state.candidates.find(c => c.id === state.c
 function renderCandidates() {
   const list = document.getElementById('candidates-list');
   let cands = filteredCandidates().filter(c => _showingArchive ? c.archived : !c.archived);
+  if (_showingArchive) {
+    cands = cands.filter(archiveDateFilterMatch);
+    // Свежие отказы — сверху
+    cands = cands.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }
   if (_candidateSearch) cands = cands.filter(c => (c.name || '').toLowerCase().includes(_candidateSearch));
   if (!cands.length) {
     list.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:rgba(255,255,255,0.3);">' +
@@ -742,6 +747,37 @@ ${crmExportBox(c.id)}`;
 
 // ── Архив отказов ────────────────────────────────────────────────
 let _showingArchive = false;
+let _archiveFilter = 'all'; // all | today | yesterday | week
+
+function setArchiveFilter(f) {
+  _archiveFilter = f;
+  document.querySelectorAll('.archive-filter-btn').forEach(b => {
+    const active = b.dataset.filter === f;
+    b.classList.toggle('active', active);
+    b.style.background = active ? 'rgba(255,255,255,0.12)' : 'transparent';
+    b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
+  });
+  renderCandidates();
+}
+
+// Сравниваем по updatedAt (ставится в момент отказа вместе с archivedAt) —
+// он даёт точное время, а не только дату строкой, так что можно отличить
+// «сегодня» от «вчера» и посчитать «последние 7 дней».
+function archiveDateFilterMatch(c) {
+  if (_archiveFilter === 'all') return true;
+  const ts = c.updatedAt;
+  if (!ts) return false; // у старых записей нет точного времени отказа — попадают только во «Все»
+  const now = new Date();
+  const d = new Date(ts);
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (_archiveFilter === 'today') return sameDay(d, now);
+  if (_archiveFilter === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    return sameDay(d, y);
+  }
+  if (_archiveFilter === 'week') return (now - d) <= 7 * 24 * 60 * 60 * 1000;
+  return true;
+}
 
 // ── Поиск по кандидатам в сайдбаре ─────────────────────────────────
 let _candidateSearch = '';
@@ -817,7 +853,9 @@ function toggleArchiveView() {
   _showingArchive = !_showingArchive;
   const label = document.getElementById('archive-toggle-label');
   if (label) label.textContent = _showingArchive ? '← Активные' : 'Архив отказов';
-  renderCandidates();
+  const filters = document.getElementById('archive-filters');
+  if (filters) filters.style.display = _showingArchive ? 'flex' : 'none';
+  if (_showingArchive) setArchiveFilter('all'); else renderCandidates();
 }
 
 function resetAnalysis() {
@@ -2018,6 +2056,7 @@ return {
   syncToSheets,
   toast,
   toggleArchiveView,
+  setArchiveFilter,
   updateCopyBtn,
   vacancyContext
 };
