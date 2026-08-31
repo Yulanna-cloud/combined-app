@@ -373,6 +373,48 @@ function renderVacancySelect() {
 
 function currentVacancy() { return state.vacancies.find(v => v.id === state.currentVacancyId); }
 
+// ── История повторных откликов ──────────────────────────────────
+// Ищем этого кандидата (по имени) среди ВСЕХ карточек, включая архивные
+// и с других вакансий — чтобы предупредить, если он уже рассматривался раньше.
+function findCandidateHistory(name) {
+  if (!name || !name.trim()) return [];
+  const norm = name.trim().toLowerCase();
+  return state.candidates
+    .filter(c => (c.name || '').trim().toLowerCase() === norm)
+    .map(c => {
+      const vac = state.vacancies.find(v => v.id === c.vacancyId);
+      let reason = c.crmRefuseReason || '';
+      if (!reason && c.rawAnalysis) reason = c.rawAnalysis.slice(0, 220) + (c.rawAnalysis.length > 220 ? '…' : '');
+      return {
+        id: c.id,
+        vacancyTitle: vac ? vac.title : (c.vacancyId ? 'вакансия удалена' : '—'),
+        archived: !!c.archived,
+        archivedAt: c.archivedAt || '',
+        date: c.date || '',
+        verdict: c.verdict || '',
+        reason
+      };
+    })
+    .sort((a, b) => (b.archivedAt || b.date || '').localeCompare(a.archivedAt || a.date || ''));
+}
+
+function renderCandidateHistoryBanner(name) {
+  const box = document.getElementById('candidate-history-banner');
+  if (!box) return;
+  const hist = findCandidateHistory(name).filter(h => h.vacancyTitle !== '—' || h.archived);
+  // Не показываем баннер про самого себя, если это единственная запись и она текущая, ещё не архивная
+  const relevant = hist.filter(h => h.archived || h.vacancyTitle !== (currentVacancy() && currentVacancy().title));
+  if (!relevant.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = relevant.map(h => {
+    const verdictLabel = h.verdict === 'red' ? '🔴 Отказ' : (h.verdict === 'green' ? '🟢 Одобрен' : (h.archived ? '⚫ В архиве' : '⏳ В процессе'));
+    return `<div style="margin-bottom:6px;">
+      <strong>⚠️ Уже рассматривался(лась)</strong> — вакансия «${h.vacancyTitle}», ${h.archivedAt || h.date || 'дата не зафиксирована'}. ${verdictLabel}
+      ${h.reason ? `<div style="margin-top:2px;color:var(--text2);font-size:11px;white-space:pre-wrap;">${h.reason}</div>` : '<div style="margin-top:2px;color:var(--text3);font-size:11px;">Причина отказа не зафиксирована — проверьте вручную в CRM.</div>'}
+    </div>`;
+  }).join('<hr style="border:none;border-top:1px solid rgba(0,0,0,0.08);margin:6px 0;">');
+}
+
 function onVacancyChange() {
   const id = document.getElementById('vacancy-select').value;
   state.currentVacancyId = id || null;
@@ -624,6 +666,8 @@ function showPanel(name) {
     document.getElementById('new-result').innerHTML = '';
     setPdfArea('', 'Загрузи PDF резюме', 'Нажми или перетащи файл сюда');
     document.getElementById('no-vacancy-warn').style.display = state.currentVacancyId ? 'none' : 'flex';
+    const hb = document.getElementById('candidate-history-banner');
+    if (hb) { hb.style.display = 'none'; hb.innerHTML = ''; }
   } else if (name === 'prompt') {
     document.getElementById('panel-prompt').classList.add('active');
     document.getElementById('nav-prompt').classList.add('active');
@@ -819,16 +863,18 @@ function showCompareFromNew() {
 function archiveCandidate() {
   const c = currentCandidate();
   if (!c) return;
-  if (!confirm('Отказать ' + c.name + '? Кандидат уйдёт в архив ассистента, а в CRM проставится статус «Отказ».')) return;
+  const reason = prompt('Отказать ' + c.name + '?\nУкажи коротко причину (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', c.crmRefuseReason || '');
+  if (reason === null) return; // нажали "Отмена"
   c.archived = true;
   c.rejected = true;
   c.verdict = 'red';
   c.archivedAt = new Date().toLocaleDateString('ru-RU'); c.updatedAt = Date.now();
+  if (reason && reason.trim()) c.crmRefuseReason = reason.trim();
   state.currentCandidateId = null;
   save();
   renderCandidates();
   syncToSheets();
-  addToCRM(c.id, { status: 'Отказ' });
+  addToCRM(c.id, { status: 'Отказ', refuseReason: (reason && reason.trim()) || undefined });
 }
 
 // Обратная синхронизация: CRM вызывает эту функцию, когда кандидату
@@ -1238,9 +1284,15 @@ function quickAddToCRM(initialStatus) {
   // Сохраняем кандидата в ассистент. Если это сразу «Отказ» — помечаем
   // отклонённым и архивируем, чтобы в ассистенте был красный статус, а не «в CRM».
   const isReject = initialStatus === 'Отказ';
+  let refuseReason = '';
+  if (isReject) {
+    const r = prompt('Укажи коротко причину отказа (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', '');
+    if (r === null) return; // нажали "Отмена" — отказ не оформляем
+    refuseReason = r.trim();
+  }
   const id = 'c_' + Date.now();
   const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: isReject, archivedAt: isReject ? date : undefined, rejected: isReject, resumeHTML: '', rawAnalysis: '', verdict: isReject ? 'red' : '', hasQuestions: false, interviewDone: false, addedToCrm: true, updatedAt: Date.now() });
+  state.candidates.unshift({ id, name, resume, date, phone, email, vacancyId: state.currentVacancyId, archived: isReject, archivedAt: isReject ? date : undefined, rejected: isReject, resumeHTML: '', rawAnalysis: '', verdict: isReject ? 'red' : '', hasQuestions: false, interviewDone: false, addedToCrm: true, updatedAt: Date.now(), crmRefuseReason: refuseReason || undefined });
   state.currentCandidateId = id;
   save();
   renderCandidates();
@@ -1248,7 +1300,7 @@ function quickAddToCRM(initialStatus) {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ hrId: id, name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ hrId: id, name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', refuseReason: refuseReason || undefined, source: 'HeadHunter' });
   switchView('crm');
   toast(initialStatus ? 'Заведён в CRM как «' + initialStatus + '», проверь и сохрани' : 'Кандидат сохранён, открываю CRM...');
 }
@@ -1903,6 +1955,7 @@ function applyIncomingResume(payload) {
   // Заполняем поля
   if (name) document.getElementById('c-name').value = name;
   if (resume) document.getElementById('c-resume').value = resume;
+  renderCandidateHistoryBanner(name);
 
   if (name || resume) {
     const sub = phone ? name + ' · ' + phone : (name || 'Данные из расширения');
@@ -1959,6 +2012,19 @@ function checkIncomingResume() {
 // Проверяем при загрузке
 setTimeout(checkIncomingResume, 500);
 
+// Проверка истории при ручном вводе имени в форме нового кандидата (с задержкой)
+let _historyCheckTimer = null;
+document.addEventListener('DOMContentLoaded', () => {
+  const nameInput = document.getElementById('c-name');
+  if (nameInput) {
+    nameInput.addEventListener('input', (e) => {
+      clearTimeout(_historyCheckTimer);
+      const val = e.target.value;
+      _historyCheckTimer = setTimeout(() => renderCandidateHistoryBanner(val), 500);
+    });
+  }
+});
+
 // Слушаем событие от расширения (когда вкладка уже открыта)
 window.addEventListener('hh_resume_ready', checkIncomingResume);
 
@@ -1968,6 +2034,9 @@ window.addEventListener('message', (e) => {
 });
 
 return {
+
+  findCandidateHistory,
+  renderCandidateHistoryBanner,
   addToCRM,
   callAPI,
   parsePDF,
