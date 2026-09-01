@@ -1451,6 +1451,11 @@ function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email:
   const emailEsc = (emailFromHR || '').replace(/"/g, '&quot;');
   const sourceEsc = (sourceFromHR || 'HR-ассистент').replace(/"/g, '&quot;');
   const hrIdEsc = (hrId || '').toString().replace(/"/g, '&quot;');
+  // Свободный текст причины отказа из ассистента (не входит в фиксированный
+  // список REFUSE_REASONS) — кладём его в комментарий, чтобы не писать его
+  // повторно руками. Экранируем для textarea (только < и &, кавычки не нужны).
+  const refuseReasonComment = (refuseFromHR && !REFUSE_REASONS.includes(refuseFromHR)) ? refuseFromHR : '';
+  const refuseReasonCommentEsc = refuseReasonComment.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
   // Мягкая проверка на дубль: ищем в CRM кандидата с тем же телефоном (или
   // ФИО, если телефона нет) по этой же вакансии. Не блокируем добавление —
@@ -1491,7 +1496,7 @@ ${dupeWarningHtml}
 <div class="fr" id="addRefuseHR" style="${REFUSE_STATUSES.includes(initialStatus)?'':'display:none'}"><label>Причина отказа</label><select id="frr"><option value="">— выберите —</option>${REFUSE_REASONS.filter(x=>x).map(r=>'<option'+(r===initialReason?' selected':'')+'>'+r+'</option>').join('')}</select></div>
 <div class="f2"><div class="fr"><label>Следующий шаг</label><input id="fnx"></div><div class="fr"><label>Дата шага</label><input type="date" id="fnd" onchange="CRM.autoFillNextStep(document.getElementById('fst').value,this.value)"></div></div>
 <div class="f2"><div class="fr"><label>Время встречи</label><input type="time" id="fmt"></div><div class="fr"></div></div>
-<div class="fr"><label>Комментарий</label><textarea id="fco"></textarea></div>
+<div class="fr"><label>Комментарий</label><textarea id="fco">${refuseReasonCommentEsc}</textarea></div>
 ${talentPoolFieldsHtml(null)}
 <div class="mfoot"><button class="btn" onclick="CRM.closeModal()">Отмена</button><button class="btn btn-primary" onclick="CRM.saveNew()">Добавить</button></div>
 </div>`;
