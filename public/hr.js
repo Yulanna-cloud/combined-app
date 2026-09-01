@@ -381,6 +381,20 @@ function currentVacancy() { return state.vacancies.find(v => v.id === state.curr
 // ── История повторных откликов ──────────────────────────────────
 // Ищем этого кандидата (по имени) среди ВСЕХ карточек, включая архивные
 // и с других вакансий — чтобы предупредить, если он уже рассматривался раньше.
+// Достаём осмысленную причину, а не обрезаем текст как попало (по числу
+// символов) — иначе обрыв часто попадает прямо перед словом "Причина:".
+// Приоритет: секция "ИТОГ" (финальный вывод после ответов в чате) →
+// строка "Причина:" целиком → в крайнем случае — начало текста.
+function extractReasonSummary(text) {
+  if (!text) return '';
+  let m = text.match(/ИТОГ\s*[\r\n]+([\s\S]*?)(?:\n---|\n\n[А-ЯЁA-Z]{4,}|$)/i);
+  if (m && m[1].trim()) return m[1].trim().slice(0, 500);
+  m = text.match(/Причина:\s*([\s\S]*?)(?:\n---|\n\n|$)/i);
+  if (m && m[1].trim()) return 'Причина: ' + m[1].trim().slice(0, 500);
+  const cut = text.slice(0, 400);
+  return cut + (text.length > 400 ? '…' : '');
+}
+
 function findCandidateHistory(name) {
   if (!name || !name.trim()) return [];
   const norm = name.trim().toLowerCase();
@@ -389,7 +403,10 @@ function findCandidateHistory(name) {
     .map(c => {
       const vac = state.vacancies.find(v => v.id === c.vacancyId);
       let reason = c.crmRefuseReason || '';
-      if (!reason && c.rawAnalysis) reason = c.rawAnalysis.slice(0, 220) + (c.rawAnalysis.length > 220 ? '…' : '');
+      // Финальный вердикт после ответов в чате важнее первичного анализа
+      // резюме — именно он обычно и содержит реальную причину отказа.
+      if (!reason && c.rawAnalysisChatAnswers) reason = extractReasonSummary(c.rawAnalysisChatAnswers);
+      if (!reason && c.rawAnalysis) reason = extractReasonSummary(c.rawAnalysis);
       return {
         id: c.id,
         vacancyTitle: vac ? vac.title : (c.vacancyId ? 'вакансия удалена' : '—'),
