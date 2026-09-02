@@ -28,6 +28,8 @@ body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 }
 .shell-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
 .shell-tab.active { background: #eef2f7; color: #1F3864; }
+#focus-mode-btn { background: rgba(255,255,255,0.1); margin-bottom: 6px; }
+#focus-mode-btn.on { background: #2e7d32; color: #fff; }
 
 .view { display: none; flex: 1; min-height: 0; overflow-y: auto; }
 .view.active { display: block; }
