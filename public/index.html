@@ -22,6 +22,9 @@
   <button class="shell-tab" id="shell-tab-analytics" onclick="switchView('analytics');ANALYTICS.render()">
     <i class="ti ti-chart-bar"></i> Аналитика
   </button>
+  <button class="shell-tab" id="focus-mode-btn" onclick="toggleFocusMode()" style="margin-left:auto;" title="Скрыть левую колонку — больше места под вопросы во время интервью">
+    <i class="ti ti-maximize"></i> Режим интервью
+  </button>
 </div>
 
 <div id="view-hr" class="view active">
@@ -474,6 +477,18 @@ function switchView(name) {
   document.getElementById('shell-tab-hr').classList.toggle('active', name === 'hr');
   document.getElementById('shell-tab-crm').classList.toggle('active', name === 'crm');
   document.getElementById('shell-tab-analytics').classList.toggle('active', name === 'analytics');
+}
+
+// Режим интервью — прячет левую колонку с меню и списком кандидатов,
+// оставляя максимум места под вопросы во время видеозвонка.
+function toggleFocusMode() {
+  const app = document.querySelector('#view-hr .app');
+  const btn = document.getElementById('focus-mode-btn');
+  const on = app.classList.toggle('focus-mode');
+  if (btn) btn.classList.toggle('on', on);
+  if (btn) btn.innerHTML = on
+    ? '<i class="ti ti-layout-sidebar"></i> Вернуть меню'
+    : '<i class="ti ti-maximize"></i> Режим интервью';
 }
 </script>
 <script src="hr.js"></script>
