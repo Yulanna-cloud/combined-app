@@ -896,7 +896,7 @@ function archiveCandidate() {
   save();
   renderCandidates();
   syncToSheets();
-  addToCRM(c.id, { status: 'Отказ', refuseReason: (reason && reason.trim()) || undefined });
+  addToCRM(c.id, { status: 'Отказ', refuseReason: (reason && reason.trim()) || undefined, refuseComment: (reason && reason.trim()) || undefined });
 }
 
 // Обратная синхронизация: CRM вызывает эту функцию, когда кандидату
@@ -1322,7 +1322,7 @@ function quickAddToCRM(initialStatus) {
 
   // Передаём кандидата в раздел CRM и переключаемся на него
   const v = currentVacancy();
-  CRM.addCandidateFromHR({ hrId: id, name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', refuseReason: refuseReason || undefined, source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ hrId: id, name, phone, email, vacancy: v ? v.title : '', customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status: initialStatus || '', refuseReason: refuseReason || undefined, refuseComment: refuseReason || undefined, source: 'HeadHunter' });
   switchView('crm');
   toast(initialStatus ? 'Заведён в CRM как «' + initialStatus + '», проверь и сохрани' : 'Кандидат сохранён, открываю CRM...');
 }
@@ -1363,21 +1363,26 @@ function addToCRM(candidateId, opts) {
 
   const status = opts.status || '';
   // Для отказа подставляем причину: из analysis, если не передана явно.
+  // Два разных значения: refuseReason — категория из фиксированного списка CRM
+  // (нужна для выпадающего списка), refuseComment — полный текст причины от ИИ
+  // или введённый вручную (идёт в поле "Комментарий", не теряется просто
+  // потому что категория угадалась и совпала с одним из готовых пунктов).
   const refuseReason = status === 'Отказ' ? (opts.refuseReason || guessRefuseReason(c.rawAnalysis)) : '';
+  const refuseComment = status === 'Отказ' ? (opts.refuseComment || (c.rawAnalysis ? extractReasonSummary(c.rawAnalysis) : '')) : '';
   const vacTitle = v ? v.title : '';
 
   // Сначала пробуем найти уже существующую запись в CRM (например, кандидат
   // был заведён туда раньше для подсчёта воронки) и просто обновить статус в
   // ней — без этого каждый повторный «Отказ» создавал бы вторую карточку.
   if (status && typeof CRM !== 'undefined' && CRM.updateStatusByMatch) {
-    const updatedId = CRM.updateStatusByMatch({ hrId: candidateId, name: c.name, phone, vacancy: vacTitle, status, refuseReason });
+    const updatedId = CRM.updateStatusByMatch({ hrId: candidateId, name: c.name, phone, vacancy: vacTitle, status, refuseReason, refuseComment });
     if (updatedId) {
       toast('Статус «' + status + '» проставлен в существующей карточке CRM (не дублируем)');
       return;
     }
   }
 
-  CRM.addCandidateFromHR({ hrId: candidateId, name: c.name, phone, email, vacancy: vacTitle, customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, source: 'HeadHunter' });
+  CRM.addCandidateFromHR({ hrId: candidateId, name: c.name, phone, email, vacancy: vacTitle, customerName: effectiveCompanyName(v), siteUrl: effectiveSite(v), openedDate: v ? v.pubOpened : '', closedDate: v ? v.pubClosed : '', status, refuseReason, refuseComment, source: 'HeadHunter' });
   switchView('crm');
   toast(status === 'Отказ' ? 'Заведён в CRM как «Отказ», проверь причину и сохрани' : 'Открываю CRM...');
 }
