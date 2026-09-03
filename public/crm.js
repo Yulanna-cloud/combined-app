@@ -1292,7 +1292,7 @@ ${(()=>{
 // статус/причину отказа прямо там — без создания второй карточки. Возвращает
 // id обновлённого кандидата или null, если подходящего не нашлось (тогда
 // вызывающий код должен создать новую запись как обычно).
-function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason }) {
+function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason, refuseComment }) {
   const phoneDigits = (phone || '').replace(/\D/g, '');
   const nameNorm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const vacNorm = (vacancy || '').trim().toLowerCase();
@@ -1306,6 +1306,9 @@ function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason 
   if (!c) return null;
   c.status = status;
   if (refuseReason !== undefined) c.refuseReason = refuseReason;
+  // Комментарий с причиной от ИИ подставляем, только если поле пустое —
+  // не затираем то, что рекрутер уже написал сам.
+  if (refuseComment && !(c.comment || '').trim()) c.comment = refuseComment;
   if (hrId && !c.hrId) c.hrId = hrId; // подтягиваем связь, если её раньше не было
   c.updatedAt = Date.now();
   D.history.unshift({ date: todayStr(), cid: c.id, name: c.name, vacancy: c.vacancy || '', event: status, desc: 'Отказ проставлен из HR-ассистента', result: '', resp: 'Я' });
@@ -1402,7 +1405,7 @@ loadLocal();updateFCustSelect();updateFVSelect();renderFilterDropdowns();render(
 // Вызывается напрямую при передаче кандидата внутри объединённого приложения,
 // либо через checkURLParams() ниже — это fallback для случая, когда CRM
 // открыта отдельной страницей по ссылке вида /?action=add&name=...
-function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, refuseReason: refuseFromHR, source: sourceFromHR }) {
+function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email: emailFromHR, vacancy: vacancyFromHR, customerName, siteUrl, openedDate, closedDate, status: statusFromHR, refuseReason: refuseFromHR, refuseComment: refuseCommentFromHR, source: sourceFromHR }) {
   if (!nameFromHR) return;
   const initialStatus = (statusFromHR && STATUSES.includes(statusFromHR)) ? statusFromHR : 'В работе';
   const initialReason = (refuseFromHR && REFUSE_REASONS.includes(refuseFromHR)) ? refuseFromHR : '';
@@ -1454,7 +1457,11 @@ function addCandidateFromHR({ hrId, name: nameFromHR, phone: phoneFromHR, email:
   // Свободный текст причины отказа из ассистента (не входит в фиксированный
   // список REFUSE_REASONS) — кладём его в комментарий, чтобы не писать его
   // повторно руками. Экранируем для textarea (только < и &, кавычки не нужны).
-  const refuseReasonComment = (refuseFromHR && !REFUSE_REASONS.includes(refuseFromHR)) ? refuseFromHR : '';
+  // Свободный текст причины отказа (обычно — вывод ИИ или то, что вписали
+  // вручную в ассистенте) — кладём в комментарий, чтобы не писать его
+  // повторно руками. Не зависит от того, совпала ли категория с готовым
+  // списком REFUSE_REASONS — это два независимых поля.
+  const refuseReasonComment = refuseCommentFromHR || '';
   const refuseReasonCommentEsc = refuseReasonComment.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
   // Мягкая проверка на дубль: ищем в CRM кандидата с тем же телефоном (или
