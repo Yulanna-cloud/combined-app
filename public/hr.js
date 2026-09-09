@@ -395,6 +395,17 @@ function extractReasonSummary(text) {
   return cut + (text.length > 400 ? '…' : '');
 }
 
+// Подсматриваем в данные CRM напрямую (они лежат в том же localStorage) —
+// на случай, если причина была написана вручную в самой CRM, а не пришла
+// от ИИ. Не требует, чтобы раздел CRM был открыт — читаем как обычные данные.
+function findCrmRecordByHrId(hrId) {
+  if (!hrId) return null;
+  try {
+    const list = JSON.parse(localStorage.getItem('crm_candidates') || '[]');
+    return list.find(x => x.hrId === hrId) || null;
+  } catch (e) { return null; }
+}
+
 function findCandidateHistory(name) {
   if (!name || !name.trim()) return [];
   const norm = name.trim().toLowerCase();
@@ -402,7 +413,10 @@ function findCandidateHistory(name) {
     .filter(c => (c.name || '').trim().toLowerCase() === norm)
     .map(c => {
       const vac = state.vacancies.find(v => v.id === c.vacancyId);
+      const crmRecord = findCrmRecordByHrId(c.id);
       let reason = c.crmRefuseReason || '';
+      if (!reason && crmRecord && crmRecord.comment) reason = crmRecord.comment.trim();
+      if (!reason && crmRecord && crmRecord.refuseReason) reason = crmRecord.refuseReason;
       // Финальный вердикт после ответов в чате важнее первичного анализа
       // резюме — именно он обычно и содержит реальную причину отказа.
       if (!reason && c.rawAnalysisChatAnswers) reason = extractReasonSummary(c.rawAnalysisChatAnswers);
@@ -430,9 +444,12 @@ function renderCandidateHistoryBanner(name) {
   box.style.display = 'block';
   box.innerHTML = relevant.map(h => {
     const verdictLabel = h.verdict === 'red' ? '🔴 Отказ' : (h.verdict === 'green' ? '🟢 Одобрен' : (h.archived ? '⚫ В архиве' : '⏳ В процессе'));
-    return `<div style="margin-bottom:6px;">
-      <strong>⚠️ Уже рассматривался(лась)</strong> — вакансия «${h.vacancyTitle}», ${h.archivedAt || h.date || 'дата не зафиксирована'}. ${verdictLabel}
-      ${h.reason ? `<div style="margin-top:2px;color:var(--text2);font-size:11px;white-space:pre-wrap;">${h.reason}</div>` : '<div style="margin-top:2px;color:var(--text3);font-size:11px;">Причина отказа не зафиксирована — проверьте вручную в CRM.</div>'}
+    return `<div style="margin-bottom:6px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <strong>⚠️ Уже рассматривался(лась)</strong> — вакансия «${h.vacancyTitle}», ${h.archivedAt || h.date || 'дата не зафиксирована'}. ${verdictLabel}
+        ${h.reason ? `<div style="margin-top:2px;color:var(--text2);font-size:11px;white-space:pre-wrap;">${h.reason}</div>` : '<div style="margin-top:2px;color:var(--text3);font-size:11px;">Причина отказа не зафиксирована нигде — можно проверить в CRM вручную.</div>'}
+      </div>
+      <button class="btn" style="flex-shrink:0;font-size:11px;padding:4px 8px;" onclick="HR.openInCRM('${h.id}')" title="Открыть эту карточку в CRM"><i class="ti ti-external-link"></i> В CRM</button>
     </div>`;
   }).join('<hr style="border:none;border-top:1px solid rgba(0,0,0,0.08);margin:6px 0;">');
 }
