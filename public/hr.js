@@ -906,7 +906,12 @@ function showCompareFromNew() {
 function archiveCandidate() {
   const c = currentCandidate();
   if (!c) return;
-  const reason = prompt('Отказать ' + c.name + '?\nУкажи коротко причину (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', c.crmRefuseReason || '');
+  // Подставляем причину прошлого отказа этого же человека (если откликался
+  // раньше) — чтобы не вписывать её заново вручную. Можно поправить прямо в
+  // окне перед подтверждением, если сейчас причина другая.
+  const priorReason = (findCandidateHistory(c.name).find(h => h.reason) || {}).reason || '';
+  const defaultReason = c.crmRefuseReason || priorReason || '';
+  const reason = prompt('Отказать ' + c.name + '?\nУкажи коротко причину (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', defaultReason);
   if (reason === null) return; // нажали "Отмена"
   c.archived = true;
   c.rejected = true;
@@ -1329,7 +1334,10 @@ function quickAddToCRM(initialStatus) {
   const isReject = initialStatus === 'Отказ';
   let refuseReason = '';
   if (isReject) {
-    const r = prompt('Укажи коротко причину отказа (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', '');
+    // Подставляем причину прошлого отказа этого же кандидата, если он уже
+    // откликался раньше — не заставляем вписывать её заново.
+    const priorReason = (findCandidateHistory(name).find(h => h.reason) || {}).reason || '';
+    const r = prompt('Укажи коротко причину отказа (можно оставить пустым) — она подскажет, если кандидат откликнется снова:', priorReason);
     if (r === null) return; // нажали "Отмена" — отказ не оформляем
     refuseReason = r.trim();
   }
@@ -1943,11 +1951,17 @@ function loadFromSheets() {
 }
 
 load();
-// Убираем дубли кандидатов (по имени, оставляем с анализом)
+// Убираем дубли кандидатов (по имени, оставляем с анализом). ВАЖНО: архивные
+// карточки (уже отказанные) никогда не трогаем — это история повторных
+// откликов, а не случайная дубликация. Раньше повторный отклик того же
+// человека на ту же вакансию мог тихо стереться при перезагрузке страницы,
+// если старая отказанная карточка была "богаче" данными (с анализом), чем
+// свежепришедшая. Дедуп применяем только внутри активных (неархивных) карточек.
 (function deduplicateCandidates() {
   const seen = {};
   state.candidates = state.candidates.filter(c => {
     if (!c.name) return true;
+    if (c.archived) return true; // история отказов — не трогаем
     const key = c.name + '|' + (c.vacancyId || '');
     if (seen[key]) {
       // Оставляем того у кого больше данных
