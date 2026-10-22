@@ -523,6 +523,7 @@ function saveVacancy() {
     state.currentVacancyId = id;
   }
   save(); renderVacancySelect(); renderCandidates(); toast('Вакансия сохранена');
+  syncToSheets(); // иначе новая/изменённая вакансия не попадает ни в таблицу, ни в расширение HH
 }
 
 // Дублирует текущую вакансию под новым названием — с тем же описанием,
@@ -549,6 +550,7 @@ function duplicateVacancy() {
   showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + title;
   renderCandidates();
   toast('Вакансия продублирована — заполни новые дату публикации, источник и стоимость');
+  syncToSheets();
 }
 
 function newVacancy() {
@@ -569,6 +571,7 @@ function createVacancy() {
   save(); closeModal(); renderVacancySelect(); fillVacancyForm();
   showPanel('vacancy'); document.getElementById('main-title').textContent = 'Вакансия: ' + name;
   renderCandidates();
+  syncToSheets();
 }
 
 function deleteVacancy() {
@@ -584,6 +587,7 @@ function deleteVacancy() {
   showPanel(state.vacancies.length ? 'vacancy' : 'settings');
   if (state.currentVacancyId) fillVacancyForm();
   toast('Вакансия удалена');
+  syncToSheets();
 }
 
 function closeModal() { document.getElementById('modal-new-vacancy').classList.remove('open'); }
@@ -1930,8 +1934,18 @@ function loadFromSheets() {
         Object.values(localMap).forEach(loc => { if (!seenIds.has(loc.id)) merged.push(loc); });
         state.candidates = merged;
       }
-      if (d.companies && d.companies.length) state.companies = d.companies;
-      if (d.vacancies && d.vacancies.length) state.vacancies = d.vacancies;
+      // Компании и вакансии тоже сливаем, а не заменяем: раньше «Загрузить»
+      // подменяло локальный список списком из таблицы, и только что созданная
+      // вакансия (ещё не долетевшая до таблицы) пропадала.
+      let pushBack = false;
+      const mergeById = (incoming, local) => {
+        const ids = new Set(incoming.map(x => x.id));
+        const extra = (local || []).filter(x => !ids.has(x.id));
+        if (extra.length) pushBack = true;
+        return incoming.concat(extra);
+      };
+      if (d.companies && d.companies.length) state.companies = mergeById(d.companies, state.companies);
+      if (d.vacancies && d.vacancies.length) state.vacancies = mergeById(d.vacancies, state.vacancies);
       if (d.prompts && Object.keys(d.prompts).length) state.prompts = { ...state.prompts, ...d.prompts };
       if (d.settings) { if (d.settings.model) state.model = d.settings.model; if (d.settings.crmUrl) state.crmUrl = d.settings.crmUrl; }
       save();
@@ -1943,6 +1957,7 @@ function loadFromSheets() {
       }
       renderCandidates();
       syncStatus('✅ Загружено', 'ok');
+      if (pushBack) syncToSheets(); // отправляем в таблицу то, чего там ещё не было
     } else { syncStatus('❌ Ошибка загрузки', 'err'); }
   };
   script.src = SHEETS_URL + '?action=read&callback=' + cbName;
