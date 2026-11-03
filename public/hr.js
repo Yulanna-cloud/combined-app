@@ -407,11 +407,14 @@ function extractReasonSummary(text) {
 // теряется при загрузке данных из Google Sheets.
 const ANON_PREFIX = 'Без ФИО';
 function isAnonName(n) { return String(n || '').startsWith(ANON_PREFIX); }
-function anonymousName(resumeId, url) {
+function anonymousName(resumeId, url, label) {
   let id = resumeId || '';
   if (!id && url) { const m = String(url).match(/resume\/([0-9a-f]{8,})/i); if (m) id = m[1]; }
   const tail = id ? String(id).slice(0, 8) : Date.now().toString(36).slice(-5);
-  return ANON_PREFIX + ' · HH ' + tail;
+  // label — «Прораб, 35 лет, Стерлитамак»: по нему резюме без ФИО можно
+  // отличить друг от друга в списке; хвост с номером делает имя уникальным.
+  const lab = String(label || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return ANON_PREFIX + ' · ' + (lab ? lab + ' · ' : 'HH ') + tail;
 }
 
 // Текст запроса к ИИ с резюме. Для резюме без ФИО (холодный поиск) — с пометкой,
@@ -429,7 +432,7 @@ function autoAnalyzeCandidate(id, attempt) {
   attempt = attempt || 0;
   const c = state.candidates.find(x => x.id === id);
   if (!c || c.rawAnalysis || !c.resume) return;
-  if (!state.apiKey) { toast('Автоанализ: сначала укажи API ключ в «Настройках»'); return; }
+  if (!state.apiKey) { c.autoError = 'Не указан API ключ в Настройках'; save(); toast('Автоанализ: сначала укажи API ключ в «Настройках»'); return; }
   if (_apiBusy) {
     if (attempt < 150) setTimeout(() => autoAnalyzeCandidate(id, attempt + 1), 2000);
     return;
@@ -449,15 +452,82 @@ function autoAnalyzeCandidate(id, attempt) {
         else if (/🟡/.test(text)) verdict = 'yellow';
         else if (/🔴/.test(text)) verdict = 'red';
         cc.resumeHTML = resultBox('Анализ резюме · ' + cc.name, text) + (isAnonName(cc.name) ? '' : crmExportBox(cc.id));
-        cc.rawAnalysis = text; cc.verdict = verdict; cc.updatedAt = Date.now();
+        cc.rawAnalysis = text; cc.verdict = verdict; cc.updatedAt = Date.now(); cc.autoError = '';
         save(); renderCandidates(); syncToSheets();
         toast('Готов анализ: ' + cc.name + (verdict === 'green' ? ' 🟢' : verdict === 'yellow' ? ' 🟡' : verdict === 'red' ? ' 🔴' : ''));
       },
-      onError: (msg) => toast('Автоанализ не удался: ' + msg)
+      onError: (msg) => { const cc = state.candidates.find(x => x.id === id); if (cc) { cc.autoError = msg || 'Ошибка анализа'; save(); } toast('Автоанализ не удался: ' + msg); }
     });
   } finally {
     state.currentVacancyId = prevVac; // системный промт уже собран с нужной вакансией
   }
+}
+
+// ── Раздел «К покупке контактов» ─────────────────────────────────
+// Список резюме без ФИО по выбранной вакансии: сначала подходящие (🟢🟡), у каждого
+// ссылка на HH, чтобы открыть резюме и купить контакты только у нужных.
+let _leadsFilter = 'good'; // good = 🟢🟡 | all = все без контактов
+function leadsOfCurrentVacancy() {
+  return state.candidates.filter(c => isAnonName(c.name) && !c.archived && (!state.currentVacancyId || c.vacancyId === state.currentVacancyId));
+}
+function updateLeadsCount() {
+  const el = document.getElementById('leads-count');
+  if (!el) return;
+  const n = leadsOfCurrentVacancy().filter(c => c.verdict === 'green' || c.verdict === 'yellow').length;
+  el.textContent = n ? String(n) : '';
+  el.style.display = n ? 'inline-block' : 'none';
+}
+function setLeadsFilter(f) { _leadsFilter = f; renderLeads(); }
+function renderLeads() {
+  const box = document.getElementById('leads-list');
+  if (!box) return;
+  const v = currentVacancy();
+  const title = document.getElementById('leads-vacancy');
+  if (title) title.textContent = v ? 'Вакансия: ' + v.title : 'Вакансия не выбрана — показаны все';
+  document.querySelectorAll('.leads-filter-btn').forEach(b => b.classList.toggle('btn-primary', b.dataset.f === _leadsFilter));
+  const rank = c => c.verdict === 'green' ? 0 : c.verdict === 'yellow' ? 1 : !c.rawAnalysis ? 2 : 3;
+  let list = leadsOfCurrentVacancy();
+  if (_leadsFilter === 'good') list = list.filter(c => c.verdict === 'green' || c.verdict === 'yellow');
+  list = list.map((c, i) => ({ c, i })).sort((a, b) => rank(a.c) - rank(b.c) || a.i - b.i).map(x => x.c);
+  if (!list.length) {
+    box.innerHTML = '<div class="empty"><i class="ti ti-lock-open"></i><p>' + (_leadsFilter === 'good'
+      ? 'Пока нет подходящих резюме без контактов. Отправляйте резюме через расширение — подходящие появятся здесь.'
+      : 'Резюме без контактов нет') + '</p></div>';
+    return;
+  }
+  box.innerHTML = list.map(c => {
+    const badge = c.verdict === 'green' ? '🟢 Подходит' : c.verdict === 'yellow' ? '🟡 Уточнить' : c.verdict === 'red' ? '🔴 Не подходит' : (c.autoError ? '⚠️ ' + escHtml(c.autoError) : '⏳ Не оценено');
+    const label = escHtml(c.name.replace(/^Без ФИО · /, ''));
+    const reason = c.rawAnalysis ? escHtml(extractReasonSummary(c.rawAnalysis).replace(/^Причина:\s*/, '').slice(0, 220)) : '';
+    const link = /^https?:\/\//i.test(c.hhUrl || '')
+      ? `<a class="btn" href="${escAttr(c.hhUrl)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="ti ti-external-link"></i> Открыть на HH</a>` : '';
+    return `<div style="border:1px solid var(--border-med);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+        <strong style="font-size:13px;">${label}</strong><span style="font-size:12px;font-weight:600;">${badge}</span>
+      </div>
+      ${reason ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;">${reason}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        ${link}
+        <button class="btn" onclick="HR.openLeadCandidate('${c.id}')"><i class="ti ti-user-check"></i> Контакты куплены — ввести данные</button>
+        <button class="btn" onclick="HR.rejectLead('${c.id}')"><i class="ti ti-x"></i> Не подходит</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openLeadCandidate(id) {
+  const c = state.candidates.find(x => x.id === id);
+  if (!c) return;
+  if (c.vacancyId && state.currentVacancyId !== c.vacancyId) {
+    state.currentVacancyId = c.vacancyId;
+    const sel = document.getElementById('vacancy-select'); if (sel) sel.value = c.vacancyId;
+  }
+  renderCandidates();
+  openCandidate(id);
+}
+function rejectLead(id) {
+  state.currentCandidateId = id;
+  archiveCandidate();   // для резюме без ФИО — только архив ассистента, в CRM не уходит
+  renderLeads();
 }
 
 function renderAnonBlock(c) {
@@ -827,6 +897,11 @@ function showPanel(name) {
     document.getElementById('panel-companies').classList.add('active');
     document.getElementById('nav-companies').classList.add('active');
     renderCompanies();
+  } else if (name === 'leads') {
+    document.getElementById('panel-leads').classList.add('active');
+    document.getElementById('nav-leads').classList.add('active');
+    document.getElementById('main-title').textContent = 'К покупке контактов';
+    renderLeads();
   } else if (name === 'rating') {
     document.getElementById('panel-rating').classList.add('active');
     document.getElementById('nav-rating').classList.add('active');
@@ -875,6 +950,9 @@ function filteredCandidates() {
 function currentCandidate() { return state.candidates.find(c => c.id === state.currentCandidateId); }
 
 function renderCandidates() {
+  updateLeadsCount();
+  const pl = document.getElementById('panel-leads');
+  if (pl && pl.classList.contains('active')) renderLeads();
   const list = document.getElementById('candidates-list');
   let cands = filteredCandidates().filter(c => _showingArchive ? c.archived : !c.archived);
   if (_showingArchive) {
@@ -2130,7 +2208,7 @@ function applyIncomingResume(payload) {
   const hhUrl = payload.url || payload.resumeUrl || payload.link || '';
   // Холодный поиск: ФИО скрыто — заводим резюме под служебным именем,
   // чтобы ИИ мог оценить опыт, а контакты вписать после покупки доступа.
-  if (!(name && String(name).trim()) && resume) name = anonymousName(payload.resumeId, hhUrl);
+  if (!(name && String(name).trim()) && resume) name = anonymousName(payload.resumeId, hhUrl, payload.label);
 
   // Проверяем что данные свежие (не старше 10 минут)
   if (ts && Date.now() - ts > 600000) return;
@@ -2205,7 +2283,11 @@ function applyIncomingResume(payload) {
   // однозначно — иначе резюме оценилось бы под чужие требования.
   if (payload.autoAnalyze && resume && state.currentCandidateId) {
     if (vacMatched) autoAnalyzeCandidate(state.currentCandidateId);
-    else toast('Автоанализ пропущен: вакансия «' + (vacancy || '—') + '» не найдена в ассистенте — выбери её вручную');
+    else {
+      const cc = state.candidates.find(x => x.id === state.currentCandidateId);
+      if (cc) { cc.autoError = 'Вакансия «' + (vacancy || '—') + '» не найдена в ассистенте'; save(); }
+      toast('Автоанализ пропущен: вакансия «' + (vacancy || '—') + '» не найдена в ассистенте — выбери её вручную');
+    }
   }
 
   // Запоминаем timestamp чтобы не применить повторно
@@ -2248,6 +2330,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // Слушаем событие от расширения (когда вкладка уже открыта)
 window.addEventListener('hh_resume_ready', checkIncomingResume);
 
+// «Открыть в ассистенте» из окна расширения: открываем карточку кандидата
+window.addEventListener('hh_open_candidate', () => {
+  const id = localStorage.getItem('hh_open_candidate');
+  localStorage.removeItem('hh_open_candidate');
+  const c = id && state.candidates.find(x => x.id === id);
+  if (!c) return;
+  if (c.vacancyId && state.currentVacancyId !== c.vacancyId) {
+    state.currentVacancyId = c.vacancyId;
+    const sel = document.getElementById('vacancy-select'); if (sel) sel.value = c.vacancyId;
+  }
+  renderCandidates();
+  openCandidate(id);
+});
+
 // Слушаем postMessage (запасной вариант)
 window.addEventListener('message', (e) => {
   if (e.data && e.data.action === 'resume') applyIncomingResume(e.data);
@@ -2257,6 +2353,9 @@ return {
 
   findCandidateHistory,
   saveAnonContacts,
+  setLeadsFilter,
+  openLeadCandidate,
+  rejectLead,
   renderCandidateHistoryBanner,
   addToCRM,
   callAPI,
