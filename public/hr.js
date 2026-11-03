@@ -399,6 +399,108 @@ function extractReasonSummary(text) {
   return cut + (text.length > 400 ? '…' : '');
 }
 
+// ── Резюме без ФИО и контактов (холодный поиск на HH) ─────────────
+// На HH в чужих резюме ФИО и контакты скрыты до покупки доступа. Такое резюме
+// заводим под служебным именем «Без ФИО · HH …», анализируем только опыт, а
+// настоящие данные вписываем в карточку после покупки контактов.
+// «Анонимность» определяем по имени, а не по отдельному флагу, — так она не
+// теряется при загрузке данных из Google Sheets.
+const ANON_PREFIX = 'Без ФИО';
+function isAnonName(n) { return String(n || '').startsWith(ANON_PREFIX); }
+function anonymousName(resumeId, url) {
+  let id = resumeId || '';
+  if (!id && url) { const m = String(url).match(/resume\/([0-9a-f]{8,})/i); if (m) id = m[1]; }
+  const tail = id ? String(id).slice(0, 8) : Date.now().toString(36).slice(-5);
+  return ANON_PREFIX + ' · HH ' + tail;
+}
+
+// Текст запроса к ИИ с резюме. Для резюме без ФИО (холодный поиск) — с пометкой,
+// что отсутствие ФИО/контактов не минус. Общий для всех мест, где идёт анализ.
+function resumeUserText(name, resume) {
+  return isAnonName(name)
+    ? `РЕЗЮМЕ КАНДИДАТА (ФИО и контакты скрыты — холодный поиск на HH, доступ к ним ещё не куплен). Оцени ТОЛЬКО опыт и соответствие вакансии. Отсутствие ФИО, телефона и e-mail не считай минусом и не включай ни в риски, ни в вопросы.\n\n${resume}`
+    : `РЕЗЮМЕ КАНДИДАТА: ${name}\n\n${resume}`;
+}
+
+// Автоанализ резюме, пришедшего из расширения (галочка «Сразу анализировать»).
+// Анализ идёт под вакансию САМОГО кандидата, а не под ту, что выбрана в списке
+// сейчас. Если ИИ занят предыдущим резюме — ждёт своей очереди.
+function autoAnalyzeCandidate(id, attempt) {
+  attempt = attempt || 0;
+  const c = state.candidates.find(x => x.id === id);
+  if (!c || c.rawAnalysis || !c.resume) return;
+  if (!state.apiKey) { toast('Автоанализ: сначала укажи API ключ в «Настройках»'); return; }
+  if (_apiBusy) {
+    if (attempt < 150) setTimeout(() => autoAnalyzeCandidate(id, attempt + 1), 2000);
+    return;
+  }
+  const prevVac = state.currentVacancyId;
+  if (c.vacancyId) state.currentVacancyId = c.vacancyId;
+  try {
+    callAPI({
+      system: buildPrompt('resume'),
+      user: resumeUserText(c.name, c.resume),
+      loadingEl: document.createElement('div'),
+      onSuccess: (text) => {
+        const cc = state.candidates.find(x => x.id === id);
+        if (!cc) return;
+        let verdict = '';
+        if (/🟢/.test(text)) verdict = 'green';
+        else if (/🟡/.test(text)) verdict = 'yellow';
+        else if (/🔴/.test(text)) verdict = 'red';
+        cc.resumeHTML = resultBox('Анализ резюме · ' + cc.name, text) + (isAnonName(cc.name) ? '' : crmExportBox(cc.id));
+        cc.rawAnalysis = text; cc.verdict = verdict; cc.updatedAt = Date.now();
+        save(); renderCandidates(); syncToSheets();
+        toast('Готов анализ: ' + cc.name + (verdict === 'green' ? ' 🟢' : verdict === 'yellow' ? ' 🟡' : verdict === 'red' ? ' 🔴' : ''));
+      },
+      onError: (msg) => toast('Автоанализ не удался: ' + msg)
+    });
+  } finally {
+    state.currentVacancyId = prevVac; // системный промт уже собран с нужной вакансией
+  }
+}
+
+function renderAnonBlock(c) {
+  const box = document.getElementById('anon-block');
+  if (!box) return;
+  if (!c || !isAnonName(c.name)) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  const url = c.hhUrl || '';
+  const link = /^https?:\/\//i.test(url)
+    ? `<a class="btn" href="${escAttr(url)}" target="_blank" rel="noopener" style="text-decoration:none;"><i class="ti ti-external-link"></i> Открыть резюме на HH</a>` : '';
+  box.innerHTML = `<div style="font-size:12px;"><strong>🔒 Резюме без ФИО и контактов</strong> — холодный поиск. Оценён только опыт. Если кандидат подходит — купите доступ к контактам на HH и впишите данные здесь: после этого карточку можно отправлять в CRM.</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+<input id="anon-name" placeholder="ФИО" style="flex:2;min-width:180px;padding:6px 8px;border:1px solid var(--border-med);border-radius:6px;font-size:12px;">
+<input id="anon-phone" placeholder="Телефон" style="flex:1;min-width:130px;padding:6px 8px;border:1px solid var(--border-med);border-radius:6px;font-size:12px;">
+<input id="anon-email" placeholder="E-mail" style="flex:1;min-width:150px;padding:6px 8px;border:1px solid var(--border-med);border-radius:6px;font-size:12px;">
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+<input id="anon-url" value="${escAttr(url)}" placeholder="Ссылка на резюме на HH (необязательно)" style="flex:1;min-width:220px;padding:6px 8px;border:1px solid var(--border-med);border-radius:6px;font-size:12px;">
+<button class="btn btn-primary" onclick="HR.saveAnonContacts()"><i class="ti ti-device-floppy"></i> Сохранить данные</button>
+${link}
+</div>`;
+}
+
+function saveAnonContacts() {
+  const c = currentCandidate();
+  if (!c) return;
+  const val = id => (document.getElementById(id) || { value: '' }).value.trim();
+  const name = val('anon-name');
+  if (!name) { alert('Укажи ФИО кандидата'); return; }
+  if (isAnonName(name)) { alert('Впиши настоящее ФИО, а не служебное имя'); return; }
+  const oldName = c.name;
+  c.name = name; c.phone = val('anon-phone'); c.email = val('anon-email'); c.hhUrl = val('anon-url');
+  c.updatedAt = Date.now();
+  // Служебное имя могло попасть в готовые тексты — заменяем на настоящее
+  ['resumeHTML', 'questionsHTML', 'chatAnswersHTML', 'interviewHTML'].forEach(f => {
+    if (c[f]) c[f] = c[f].split(oldName).join(name);
+  });
+  // У анонимного резюме блока «Добавить в CRM» не было — добавляем теперь
+  if (c.resumeHTML && !c.resumeHTML.includes('crm-export-box')) c.resumeHTML += crmExportBox(c.id);
+  save(); renderCandidates(); openCandidate(c.id); syncToSheets();
+  toast('Данные сохранены — теперь кандидата можно отправить в CRM');
+}
+
 // Подсматриваем в данные CRM напрямую (они лежат в том же localStorage) —
 // на случай, если причина была написана вручную в самой CRM, а не пришла
 // от ИИ. Не требует, чтобы раздел CRM был открыт — читаем как обычные данные.
@@ -831,7 +933,8 @@ function openCandidate(id) {
 <button class="btn btn-primary btn-full" style="margin-bottom:14px;" onclick="HR.reAnalyzeCandidate()">
 <i class="ti ti-sparkles"></i> Проанализировать резюме
 </button>
-${crmExportBox(c.id)}`;
+${isAnonName(c.name) ? '' : crmExportBox(c.id)}`;
+  renderAnonBlock(c);
   // Показываем кнопку копирования для активной вкладки
   setTimeout(() => updateCopyBtn('resume'), 100);
 }
@@ -910,6 +1013,14 @@ function showCompareFromNew() {
 function archiveCandidate() {
   const c = currentCandidate();
   if (!c) return;
+  if (isAnonName(c.name)) {
+    if (!confirm('Резюме не подходит — убрать в архив? В CRM оно не попадёт (нет ФИО и контактов).')) return;
+    c.archived = true; c.rejected = true; c.verdict = 'red';
+    c.archivedAt = new Date().toLocaleDateString('ru-RU'); c.updatedAt = Date.now();
+    state.currentCandidateId = null;
+    save(); renderCandidates(); syncToSheets();
+    return;
+  }
   // Подставляем причину прошлого отказа этого же человека (если откликался
   // раньше) — чтобы не вписывать её заново вручную. Можно поправить прямо в
   // окне перед подтверждением, если сейчас причина другая.
@@ -997,14 +1108,14 @@ function reAnalyzeCandidate() {
   const el = document.getElementById('resume-content');
   callAPI({
     system: buildPrompt('resume'),
-    user: 'РЕЗЮМЕ КАНДИДАТА: ' + c.name + '\n\n' + c.resume,
+    user: resumeUserText(c.name, c.resume),
     loadingEl: el,
     onSuccess: (text) => {
       let verdict = '';
       if (/🟢/.test(text)) verdict = 'green';
       else if (/🟡/.test(text)) verdict = 'yellow';
       else if (/🔴/.test(text)) verdict = 'red';
-      c.resumeHTML = resultBox('Анализ резюме · ' + c.name, text) + crmExportBox(c.id);
+      c.resumeHTML = resultBox('Анализ резюме · ' + c.name, text) + (isAnonName(c.name) ? '' : crmExportBox(c.id));
       c.rawAnalysis = text;
       c.verdict = verdict;
       save(); renderCandidates();
@@ -1318,6 +1429,7 @@ function quickAddToCRM(initialStatus) {
   const name = document.getElementById('c-name').value.trim();
   const resume = document.getElementById('c-resume').value.trim();
   if (!name) { toast('Заполни имя кандидата'); return; }
+  if (isAnonName(name)) { alert('Это резюме без ФИО и контактов — в CRM его не завести. Нажми «Проанализировать резюме»; ФИО впишешь в карточке после покупки контактов.'); return; }
 
   // Если кандидат уже был автосохранён расширением — берём его телефон/email напрямую,
   // не дожидаясь регулярки (она ловит только то, что явно есть в тексте резюме).
@@ -1376,6 +1488,7 @@ function addToCRM(candidateId, opts) {
   opts = opts || {};
   const c = state.candidates.find(x => x.id === candidateId);
   if (!c) return;
+  if (isAnonName(c.name)) { alert('Это резюме без ФИО и контактов. Сначала купите доступ на HH и впишите данные в блоке «Резюме без ФИО» вверху карточки — потом можно отправить в CRM.'); return; }
 
   const v = state.vacancies.find(x => x.id === c.vacancyId);
 
@@ -1424,6 +1537,8 @@ function addToCRM(candidateId, opts) {
 // подсказанной причиной, а в ассистенте помечаем красным «отказ» и в архив.
 function rejectToCRM(candidateId) {
   const c = state.candidates.find(x => x.id === candidateId);
+  // Анонимное резюме в CRM не заводим — просто убираем в архив ассистента
+  if (c && isAnonName(c.name)) { state.currentCandidateId = c.id; archiveCandidate(); return; }
   if (c) {
     c.rejected = true;
     c.archived = true;
@@ -1454,23 +1569,34 @@ ${alreadyAdded ? '' : `<button class="btn btn-crm" style="background:var(--red-t
 
 // ── Actions ───────────────────────────────────────────────────────
 function analyzeResume() {
-  const name = document.getElementById('c-name').value.trim();
+  let name = document.getElementById('c-name').value.trim();
   const resume = document.getElementById('c-resume').value.trim();
-  if (!name || !resume) { alert('Заполни имя кандидата и текст резюме (загрузи PDF или вставь текст)'); return; }
+  if (!resume) { alert('Вставь текст резюме (загрузи PDF или вставь текст)'); return; }
+  // Холодный поиск: ФИО скрыто — анализируем без него, под служебным именем
+  if (!name) { name = anonymousName(); document.getElementById('c-name').value = name; }
+  const anon = isAnonName(name);
   const el = document.getElementById('new-result');
   callAPI({
     system: buildPrompt('resume'),
-    user: `РЕЗЮМЕ КАНДИДАТА: ${name}\n\n${resume}`,
+    user: resumeUserText(name, resume),
     loadingEl: el,
     onSuccess: (text) => {
-      const id = 'c_' + Date.now();
       const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
       // Парсим вердикт из текста ИИ
       let verdict = '';
       if (/🟢/.test(text)) verdict = 'green';
       else if (/🟡/.test(text)) verdict = 'yellow';
       else if (/🔴/.test(text)) verdict = 'red';
-      state.candidates.unshift({ id, name, resume, date, vacancyId: state.currentVacancyId, resumeHTML: resultBox('Анализ резюме · ' + name, text) + crmExportBox(id), rawAnalysis: text, verdict, hasQuestions: false, interviewDone: false, addedToCrm: false });
+      // Если расширение уже автосохранило этого кандидата — обновляем его же,
+      // а не заводим вторую карточку-дубль.
+      const existing = state.candidates.find(x => x.name === name && !x.archived && x.vacancyId === state.currentVacancyId);
+      const id = existing ? existing.id : 'c_' + Date.now();
+      const resumeHTML = resultBox('Анализ резюме · ' + name, text) + (anon ? '' : crmExportBox(id));
+      if (existing) {
+        Object.assign(existing, { resume, resumeHTML, rawAnalysis: text, verdict, updatedAt: Date.now() });
+      } else {
+        state.candidates.unshift({ id, name, resume, date, vacancyId: state.currentVacancyId, resumeHTML, rawAnalysis: text, verdict, hasQuestions: false, interviewDone: false, addedToCrm: false });
+      }
       state.currentCandidateId = id;
       save();
       el.innerHTML = `<div class="info-box info-green"><i class="ti ti-circle-check"></i> Готово! Открываю карточку...</div>`;
@@ -1999,7 +2125,12 @@ function applyIncomingResume(payload) {
   if (!payload || !payload.action) return;
   if (payload.action !== 'resume') return;
 
-  const { name, phone, email, vacancy, resume, ts } = payload;
+  const { phone, email, vacancy, resume, ts } = payload;
+  let name = payload.name;
+  const hhUrl = payload.url || payload.resumeUrl || payload.link || '';
+  // Холодный поиск: ФИО скрыто — заводим резюме под служебным именем,
+  // чтобы ИИ мог оценить опыт, а контакты вписать после покупки доступа.
+  if (!(name && String(name).trim()) && resume) name = anonymousName(payload.resumeId, hhUrl);
 
   // Проверяем что данные свежие (не старше 10 минут)
   if (ts && Date.now() - ts > 600000) return;
@@ -2011,6 +2142,7 @@ function applyIncomingResume(payload) {
   showPanel('new');
 
   // Выбираем вакансию
+  let vacMatched = false;
   if (vacancy && state.vacancies.length) {
     // Сначала точное совпадение названия — иначе «Инженер ПТО Пермь» из расширения
     // попадёт в первую частично совпавшую вакансию «Инженер ПТО» (другой город)
@@ -2021,6 +2153,7 @@ function applyIncomingResume(payload) {
         vLower.includes(v.title.toLowerCase())
       );
     if (found) {
+      vacMatched = true;
       state.currentVacancyId = found.id;
       document.getElementById('vacancy-select').value = found.id;
       save();
@@ -2035,13 +2168,15 @@ function applyIncomingResume(payload) {
   renderCandidateHistoryBanner(name);
 
   if (name || resume) {
-    const sub = phone ? name + ' · ' + phone : (name || 'Данные из расширения');
+    const sub = isAnonName(name) ? 'Резюме без ФИО и контактов — оценка только по опыту' : (phone ? name + ' · ' + phone : (name || 'Данные из расширения'));
     setPdfArea('loaded', 'Резюме загружено с HH.ru', sub);
   }
 
   // Автосохранение кандидата сразу при получении
   if (name && resume) {
-    const exists = state.candidates.find(x => x.name === name && !x.archived);
+    // Анонимное резюме сверяем ещё и по вакансии: одно и то же резюме можно
+    // отдельно оценить под «Прораба» и под «Главного инженера».
+    const exists = state.candidates.find(x => x.name === name && !x.archived && (!isAnonName(name) || x.vacancyId === state.currentVacancyId));
     if (!exists) {
       const autoId = 'c_' + Date.now();
       const autoDate = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -2049,7 +2184,7 @@ function applyIncomingResume(payload) {
         id: autoId, name, resume, date: autoDate, phone: phone || '', email: email || '',
         vacancyId: state.currentVacancyId, archived: false,
         resumeHTML: '', rawAnalysis: '', verdict: '',
-        hasQuestions: false, interviewDone: false, addedToCrm: false, qFocus: ''
+        hasQuestions: false, interviewDone: false, addedToCrm: false, qFocus: '', hhUrl: hhUrl || ''
       });
       state.currentCandidateId = autoId;
       save();
@@ -2060,9 +2195,17 @@ function applyIncomingResume(payload) {
       if (resume && !exists.resume) exists.resume = resume;
       if (email && !exists.email) exists.email = email;
       if (phone && !exists.phone) exists.phone = phone;
+      if (hhUrl && !exists.hhUrl) exists.hhUrl = hhUrl;
       state.currentCandidateId = exists.id;
       save();
     }
+  }
+
+  // Автоанализ (галочка в расширении). Только если вакансия определена
+  // однозначно — иначе резюме оценилось бы под чужие требования.
+  if (payload.autoAnalyze && resume && state.currentCandidateId) {
+    if (vacMatched) autoAnalyzeCandidate(state.currentCandidateId);
+    else toast('Автоанализ пропущен: вакансия «' + (vacancy || '—') + '» не найдена в ассистенте — выбери её вручную');
   }
 
   // Запоминаем timestamp чтобы не применить повторно
@@ -2113,6 +2256,7 @@ window.addEventListener('message', (e) => {
 return {
 
   findCandidateHistory,
+  saveAnonContacts,
   renderCandidateHistoryBanner,
   addToCRM,
   callAPI,
