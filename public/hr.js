@@ -138,6 +138,45 @@ const DEFAULT_PROMPTS = {
 
 ОГРАНИЧЕНИЕ ОБЪЁМА: пиши компактно, без вступлений и повторов. Суммарно по всем 7 пунктам — не больше 600 слов. Это важнее полноты — лучше кратко и по делу, чем развёрнуто.`,
 
+  feedback: `Ты — опытный рекрутер. Ты уже проанализировал резюме кандидата под вакансию (твой прежний анализ будет в данных). Теперь рекрутер-человек оставил комментарий или сомнение по этому анализу — нужно его пересмотреть.
+
+{VACANCY}
+
+КАК УЧЕСТЬ КОММЕНТАРИЙ РЕКРУТЕРА
+Комментарий — это новая вводная от человека, который лучше знает вакансию, компанию и рынок. Это НЕ приказ поменять вердикт. Взвесь его сам:
+— если комментарий снимает или меняет критерий («это не обязательно», «мне важен опыт X») — пересчитай оценку и вердикт по новым вводным;
+— если комментарий — сомнение («давай проверим вопросами») — не меняй вердикт механически: определи, что именно неясно, и преврати это в вопросы кандидату;
+— если комментарий не меняет сути — оставь вердикт как есть и честно объясни почему. Не поддакивай и не упрямься.
+Если в данных есть ответы кандидата из чата HH — учти и их. Не выдумывай факты, которых нет в резюме.
+
+ФОРМАТ ОТВЕТА (прежний формат плюс блок изменений, без вступлений)
+
+РЕШЕНИЕ
+Один вариант: 🟢 Приоритет — звонить первым / 🟡 Звонить, но сначала уточнить / 🔴 Не рассматривать
+Причина: не более 2 предложений.
+
+ЧТО ИЗМЕНИЛОСЬ ПОСЛЕ ОБРАТНОЙ СВЯЗИ
+Вердикт: было «…», стало «…» (или «не изменился, потому что …»). В этом блоке не используй цветные кружки — пиши словами.
+Оценка: было X/10, стало Y/10.
+Что пересмотрено и почему: 1–3 коротких пункта.
+
+СООТВЕТСТВИЕ ВАКАНСИИ
+Оценка: X/10
+
+СИЛЬНЫЕ СТОРОНЫ
+Максимум 5 коротких пунктов.
+
+РИСКИ
+Максимум 5 коротких пунктов, каждый с пометкой [жёсткое] или [предполагаемое — уточнить].
+
+ВОПРОСЫ ДЛЯ СКРИНИНГА В ЧАТ HH
+Всегда заполняй этот блок (рекрутер сомневается). 3–5 коротких вопросов, которые можно отправить кандидату в чат HH как есть. Нумерация простыми числами с точкой («1. », «2. »), без эмодзи и маркеров. Обязательно включи: (а) проверку формальных требований вакансии, по которым резюме молчит или неясно (образование, формат работы, график, тип занятости); (б) всё, что рекрутер поставил под сомнение в комментарии.
+
+ВОПРОСЫ ДЛЯ ПЕРВОГО ЗВОНКА
+Максимум 3 вопроса, ответы на которые могут изменить решение.
+
+ИТОГ
+Одна строка: Рекомендуется / Не рекомендуется к дальнейшему рассмотрению.`,
   chatAnswers: `Ты — строгий, требовательный рекрутер. Кандидату в чате HH.ru были отправлены уточняющие вопросы по резюме (текст вопросов ты найдёшь в анализе резюме, в разделе «ВОПРОСЫ ДЛЯ СКРИНИНГА В ЧАТ HH»), и он на них ответил.
 
 {VACANCY}
@@ -417,6 +456,138 @@ function anonymousName(resumeId, url, label) {
   return ANON_PREFIX + ' · ' + (lab ? lab + ' · ' : 'HH ') + tail;
 }
 
+// ── Обратная связь на анализ и журнал истории ─────────────────────
+// Журнал (c.fbLog — JSON-строка) хранит: анализ ИИ, комментарии рекрутера, пересмотры,
+// ответы кандидата. Он же переносится в «История кандидата» в CRM.
+function verdictFromText(text) {
+  const t = String(text || '');
+  let best = '', pos = Infinity;
+  [['green', '🟢'], ['yellow', '🟡'], ['red', '🔴']].forEach(([v, e]) => {
+    const i = t.indexOf(e); if (i !== -1 && i < pos) { pos = i; best = v; }
+  });
+  return best; // берём самый ранний значок — это строка РЕШЕНИЕ
+}
+function scoreFromText(text) {
+  const m = String(text || '').match(/Оценка:\s*(\d+(?:[.,]\d+)?)\s*\/\s*10/);
+  return m ? m[1].replace(',', '.') : '';
+}
+function analysisSummary(text) {
+  const t = String(text || '');
+  const head = (t.match(/[🟢🟡🔴][^\n]*/) || [''])[0].trim();
+  const sc = scoreFromText(t);
+  const r = ((t.match(/Причина:\s*([^\n]*)/) || [])[1] || '').trim();
+  return [head, sc ? 'Оценка ' + sc + '/10' : '', r ? 'Причина: ' + r : ''].filter(Boolean).join(' · ');
+}
+function changedSummary(text) {
+  const m = String(text || '').match(/ЧТО ИЗМЕНИЛОСЬ[^\n]*\n([\s\S]*?)(?:\n\s*---|\n\s*СООТВЕТСТВИЕ|$)/i);
+  return m ? m[1].trim().replace(/\s*\n\s*/g, ' ') : '';
+}
+function getLog(c) { try { return JSON.parse(c.fbLog || '[]'); } catch (e) { return []; } }
+function logEvent(c, event, desc, who, text) {
+  const log = getLog(c);
+  log.push({ ts: Date.now(), event, desc: String(desc || '').slice(0, 800), who: who || '', text: text ? String(text) : undefined });
+  // В ячейку Google Sheets помещается ~50 000 знаков: сначала выбрасываем полные
+  // тексты у старых записей, потом сами старые записи.
+  while (log.length && JSON.stringify(log).length > 30000) {
+    const old = log.find(e => e.text);
+    if (old) delete old.text; else log.shift();
+  }
+  c.fbLog = JSON.stringify(log);
+}
+// Анализы, сделанные до появления журнала, тоже сохраняем как первую запись
+function ensureBaselineLogged(c) {
+  if (!c.rawAnalysis) return;
+  const log = getLog(c);
+  const sum = analysisSummary(c.rawAnalysis);
+  if (log.some(e => e.text === c.rawAnalysis || (/^Анализ/.test(e.event) && e.desc === sum))) return;
+  log.push({ ts: c.updatedAt || Date.now(), event: 'Анализ резюме (ИИ)', desc: sum, who: 'ИИ', text: c.rawAnalysis });
+  log.sort((a, b) => a.ts - b.ts);
+  c.fbLog = JSON.stringify(log);
+}
+function recruiterComments(c) { return getLog(c).filter(e => e.event === 'Комментарий рекрутера').map(e => e.desc); }
+// Журнал → история кандидата в CRM (если карточка там уже есть; иначе CRM заберёт его при создании карточки)
+function syncLogToCrm(c) {
+  save();
+  try { if (typeof CRM !== 'undefined' && CRM.syncHrLog) CRM.syncHrLog(c.id); } catch (e) {}
+}
+function logAnalysisEvent(c, text, event) {
+  if (!c) return;
+  logEvent(c, event || 'Анализ резюме (ИИ)', analysisSummary(text), 'ИИ', text);
+  syncLogToCrm(c);
+}
+
+function renderFeedbackBlock(c) {
+  const box = document.getElementById('feedback-block');
+  if (!box) return;
+  if (!c || !c.rawAnalysis) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const log = getLog(c).slice().reverse();
+  const items = log.map(e => {
+    const d = new Date(e.ts);
+    const when = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const full = e.text ? `<details style="margin-top:4px;"><summary style="cursor:pointer;font-size:11px;color:var(--text3);">Показать полный текст</summary><div style="white-space:pre-wrap;font-size:12px;margin-top:4px;">${escHtml(stripMd(e.text))}</div></details>` : '';
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border-light);font-size:12px;"><b>${when} · ${escHtml(e.event)}</b><div style="color:var(--text2);margin-top:2px;white-space:pre-wrap;">${escHtml(e.desc)}</div>${full}</div>`;
+  }).join('');
+  box.style.display = 'block';
+  box.innerHTML = `<div style="border:1px solid var(--border-med);border-radius:8px;padding:12px;background:#fff;">
+  <div style="font-weight:700;font-size:13px;margin-bottom:6px;">💬 Ваш комментарий / сомнение</div>
+  <textarea id="fb-text" rows="3" placeholder="Например: «сомневаюсь, давай проверим вопросами» · «этот критерий не обязателен, не снижай за него оценку» · «мне важен опыт X»" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border-med);border-radius:6px;font-size:13px;font-family:inherit;"></textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+    <button class="btn btn-primary" onclick="HR.submitFeedback()"><i class="ti ti-refresh"></i> Пересмотреть</button>
+    <button class="btn" onclick="HR.switchTab('chatanswers')"><i class="ti ti-message"></i> Ввести ответы кандидата</button>
+  </div>
+  <p class="field-hint" style="margin-top:6px;">ИИ учтёт комментарий как новую вводную от рекрутера и сам решит, менять ли вердикт. Вопросы для чата HH и для звонка он выдаст в любом случае.</p>
+  <div id="feedback-status"></div>
+  ${items ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;">История по кандидату (${log.length})</summary>${items}</details>` : ''}
+</div>`;
+}
+
+function submitFeedback() {
+  const c = currentCandidate();
+  if (!c || !c.rawAnalysis) return;
+  const comment = ((document.getElementById('fb-text') || {}).value || '').trim();
+  if (!comment) { toast('Напиши комментарий или сомнение'); return; }
+  if (c.vacancyId && state.currentVacancyId !== c.vacancyId) {
+    state.currentVacancyId = c.vacancyId;
+    const sel = document.getElementById('vacancy-select'); if (sel) sel.value = c.vacancyId;
+    save();
+  }
+  const prev = recruiterComments(c).slice(-3);
+  const anon = isAnonName(c.name);
+  const user = (anon
+      ? 'РЕЗЮМЕ КАНДИДАТА (ФИО и контакты скрыты — оценивай только опыт; отсутствие ФИО и контактов не минус):'
+      : 'РЕЗЮМЕ КАНДИДАТА: ' + c.name + ':') + '\n' + c.resume +
+    '\n\nТВОЙ ПРЕДЫДУЩИЙ АНАЛИЗ:\n' + c.rawAnalysis +
+    (c.chatAnswers ? '\n\nОТВЕТЫ КАНДИДАТА В ЧАТЕ HH:\n' + c.chatAnswers : '') +
+    (prev.length ? '\n\nПРЕДЫДУЩИЕ КОММЕНТАРИИ РЕКРУТЕРА:\n- ' + prev.join('\n- ') : '') +
+    '\n\nНОВЫЙ КОММЕНТАРИЙ РЕКРУТЕРА:\n' + comment;
+  const el = document.getElementById('feedback-status');
+  callAPI({
+    system: buildPrompt('feedback'),
+    user,
+    loadingEl: el,
+    maxTokens: 2200,
+    timeoutMs: 120000,
+    onSuccess: (text) => {
+      ensureBaselineLogged(c); // прежняя версия анализа сохраняется в историю до замены
+      const changed = changedSummary(text);
+      logEvent(c, 'Комментарий рекрутера', comment, 'Я');
+      logEvent(c, 'Пересмотр анализа (ИИ)', analysisSummary(text) + (changed ? ' · Что изменилось: ' + changed : ''), 'ИИ', text);
+      c.rawAnalysis = text;
+      c.verdict = verdictFromText(text) || c.verdict;
+      c.updatedAt = Date.now();
+      c.resumeHTML = resultBox('Анализ резюме (пересмотр) · ' + c.name, text) + (anon ? '' : crmExportBox(c.id));
+      save(); renderCandidates(); syncToSheets(); syncLogToCrm(c);
+      if (state.currentCandidateId === c.id) {
+        document.getElementById('resume-content').innerHTML = c.resumeHTML;
+        renderFeedbackBlock(c);
+        try { document.getElementById('resume-content').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+      }
+      toast('Анализ пересмотрен');
+    },
+    onError: (msg) => { el.innerHTML = errorBox(msg); }
+  });
+}
+
 // Текст запроса к ИИ с резюме. Для резюме без ФИО (холодный поиск) — с пометкой,
 // что отсутствие ФИО/контактов не минус. Общий для всех мест, где идёт анализ.
 function resumeUserText(name, resume) {
@@ -453,6 +624,7 @@ function autoAnalyzeCandidate(id, attempt) {
         else if (/🔴/.test(text)) verdict = 'red';
         cc.resumeHTML = resultBox('Анализ резюме · ' + cc.name, text) + (isAnonName(cc.name) ? '' : crmExportBox(cc.id));
         cc.rawAnalysis = text; cc.verdict = verdict; cc.updatedAt = Date.now(); cc.autoError = '';
+        logAnalysisEvent(cc, text);
         save(); renderCandidates(); syncToSheets();
         toast('Готов анализ: ' + cc.name + (verdict === 'green' ? ' 🟢' : verdict === 'yellow' ? ' 🟡' : verdict === 'red' ? ' 🔴' : ''));
       },
@@ -1013,6 +1185,7 @@ function openCandidate(id) {
 </button>
 ${isAnonName(c.name) ? '' : crmExportBox(c.id)}`;
   renderAnonBlock(c);
+  renderFeedbackBlock(c);
   // Показываем кнопку копирования для активной вкладки
   setTimeout(() => updateCopyBtn('resume'), 100);
 }
@@ -1169,6 +1342,7 @@ function resetAnalysis() {
     </div>`;
   document.getElementById('questions-content').innerHTML = '';
   document.getElementById('interview-content').innerHTML = '';
+  renderFeedbackBlock(c);
   switchTab('resume');
   toast('Анализ сброшен');
 }
@@ -1198,6 +1372,7 @@ function reAnalyzeCandidate() {
       c.verdict = verdict;
       save(); renderCandidates();
       el.innerHTML = c.resumeHTML;
+      logAnalysisEvent(c, text); renderFeedbackBlock(c);
     },
     onError: (msg) => { el.innerHTML = errorBox(msg); }
   });
@@ -1287,12 +1462,33 @@ function vacancyContext() {
   return parts.join('\n\n');
 }
 
+// Эти правила подмешиваются в промты прямо в коде (а не только лежат в DEFAULT_PROMPTS):
+// промт, ранее сохранённый в браузере или таблице, перекрывает DEFAULT_PROMPTS, и новые
+// правила до него не дошли бы без кнопки «Сбросить».
+const REQUIREMENTS_RULES = `ЖЁСТКИЕ И ПРЕДПОЛАГАЕМЫЕ ТРЕБОВАНИЯ — разделяй явно:
+— ЖЁСТКОЕ: прямо написано в тексте вакансии, её описании или комментариях рекрутера (например, «обязательно высшее образование», «только очно», «опыт X от 3 лет»).
+— ПРЕДПОЛАГАЕМОЕ/ЖЕЛАТЕЛЬНОЕ: ты вывел его сам — из специфики компании, названия должности или типового профиля (например, «раз компания в электротехнике, нужен опыт в электротехнике», если в вакансии этого не сказано).
+Правила:
+1. В блоке РИСКИ помечай каждый пункт: [жёсткое] или [предполагаемое — уточнить].
+2. Отсутствие или неподтверждённость ПРЕДПОЛАГАЕМОГО требования НЕ может быть причиной 🔴 и само по себе не опускает оценку ниже 5/10 — преврати это в вопрос кандидату (в чат HH или на звонок).
+3. 🔴 допустимо только если нарушено ЖЁСТКОЕ требование (подтверждённо по резюме) либо у кандидата нет релевантного опыта по сути должности.
+4. Если резюме молчит о жёстком требовании (ни да, ни нет) — это не нарушение, а вопрос в чат HH.`;
+
+const CHAT_ANSWERS_ADDON = `ДОПОЛНИТЕЛЬНО (обязательно): в самом конце ответа добавь блок
+ПЕРЕСЧЁТ ПО ОТВЕТАМ
+Решение: 🟢 или 🟡 или 🔴 (одно; «звать» = 🟢/🟡, «не звать» = 🔴; должно совпадать с вердиктом выше)
+Оценка: X/10 (учти ответы кандидата и комментарии рекрутера, если они есть в данных)
+Что изменилось: 1–2 предложения — как ответы повлияли на прежнюю оценку.
+Комментарии рекрутера — новая вводная, а не приказ. Прямой ответ кандидата на формальную проверку (образование, формат, график, занятость) засчитывай.`;
+
 function buildPrompt(type) {
   let p = (state.prompts[type] || DEFAULT_PROMPTS[type] || '').replace('{VACANCY}', vacancyContext()).replace('{MOTIVES}', MOTIVES_REFERENCE);
+  if (type === 'resume' || type === 'feedback') p += '\n\n---\n\n' + REQUIREMENTS_RULES;
+  if (type === 'chatAnswers') p += '\n\n---\n\n' + CHAT_ANSWERS_ADDON;
   // Уроки из практики (несовпадения оценки ИИ с реальным решением директора и
   // т.п.) подмешиваются туда, где принимается решение по кандидату, — чтобы
   // ИИ со временем учитывал накопленные паттерны, а не только формальный опыт.
-  if ((type === 'resume' || type === 'chatAnswers') && state.calibrationNotes && state.calibrationNotes.trim()) {
+  if ((type === 'resume' || type === 'chatAnswers' || type === 'feedback') && state.calibrationNotes && state.calibrationNotes.trim()) {
     p += '\n\n---\n\nУРОКИ ИЗ ПРОШЛЫХ РЕШЕНИЙ (заметки рекрутера о случаях, где реальное решение разошлось с ожиданиями, или другие важные паттерны — учитывай их, если они применимы к текущему кандидату, но не притягивай за уши, если явно не по теме):\n' + state.calibrationNotes.trim();
   }
   return p;
@@ -1676,6 +1872,7 @@ function analyzeResume() {
         state.candidates.unshift({ id, name, resume, date, vacancyId: state.currentVacancyId, resumeHTML, rawAnalysis: text, verdict, hasQuestions: false, interviewDone: false, addedToCrm: false });
       }
       state.currentCandidateId = id;
+      logAnalysisEvent(state.candidates.find(x => x.id === id), text);
       save();
       el.innerHTML = `<div class="info-box info-green"><i class="ti ti-circle-check"></i> Готово! Открываю карточку...</div>`;
       syncToSheets(); // автосохранение после анализа
@@ -1742,8 +1939,9 @@ function saveChatAnswersOnly() {
   const answers = document.getElementById('ca-answers').value.trim();
   if (!answers) { alert('Вставь ответы кандидата из чата HH'); return; }
   c.chatAnswers = answers;
+  logEvent(c, 'Ответы кандидата в чате', answers, 'Кандидат');
   save(); renderCandidates();
-  syncToSheets();
+  syncToSheets(); syncLogToCrm(c);
   toast('Ответы сохранены (без анализа)');
 }
 
@@ -1753,16 +1951,27 @@ function analyzeChatAnswers() {
   if (!answers) { alert('Вставь ответы кандидата из чата HH'); return; }
   const el = document.getElementById('chatanswers-content');
   c.chatAnswers = answers;
+  const comments = recruiterComments(c);
   callAPI({
     system: buildPrompt('chatAnswers'),
-    user: `АНАЛИЗ РЕЗЮМЕ (включая вопросы, заданные кандидату):\n${c.rawAnalysis}\n\nОТВЕТЫ КАНДИДАТА В ЧАТЕ HH:\n${answers}`,
+    user: `АНАЛИЗ РЕЗЮМЕ (текущая версия, включая вопросы, заданные кандидату):\n${c.rawAnalysis}` +
+      (comments.length ? `\n\nКОММЕНТАРИИ РЕКРУТЕРА (новая вводная, а не приказ):\n- ${comments.join('\n- ')}` : '') +
+      `\n\nОТВЕТЫ КАНДИДАТА В ЧАТЕ HH:\n${answers}`,
     loadingEl: el,
     onSuccess: (text) => {
       c.chatAnswersHTML = resultBox('Вердикт по ответам в чате · ' + c.name, text);
       c.rawAnalysisChatAnswers = text;
+      // Пересчитанный вердикт попадает в цветную метку кандидата
+      const recalc = text.match(/ПЕРЕСЧЁТ ПО ОТВЕТАМ[\s\S]*$/i);
+      const newVerdict = recalc ? verdictFromText(recalc[0]) : '';
+      if (newVerdict) c.verdict = newVerdict;
+      const verdictLine = ((text.match(/ВЕРДИКТ[:\s]*([^\n]*)/i) || [])[1] || '').trim();
+      const recalcLine = recalc ? recalc[0].replace(/ПЕРЕСЧЁТ ПО ОТВЕТАМ\s*/i, '').trim().replace(/\s*\n\s*/g, ' · ') : '';
+      logEvent(c, 'Ответы кандидата в чате', answers, 'Кандидат');
+      logEvent(c, 'Оценка по ответам кандидата (ИИ)', [verdictLine, recalcLine].filter(Boolean).join(' · ').slice(0, 700), 'ИИ', text);
       save(); renderCandidates();
       el.innerHTML = c.chatAnswersHTML;
-      syncToSheets();
+      syncToSheets(); syncLogToCrm(c);
     },
     onError: (msg) => { el.innerHTML = errorBox(msg); }
   });
@@ -2353,6 +2562,7 @@ return {
 
   findCandidateHistory,
   saveAnonContacts,
+  submitFeedback,
   setLeadsFilter,
   openLeadCandidate,
   rejectLead,
