@@ -1225,6 +1225,7 @@ function saveNew(){
   const hrIdVal=document.getElementById('fhrid')?.value||'';
   D.candidates.push({id:document.getElementById('fi')?.value||nextId(),hrId:hrIdVal,added:document.getElementById('fa')?.value||todayStr(),name,vacancy:vacPicked,contacts:document.getElementById('fphone')?.value.trim()||'',email:document.getElementById('femail')?.value.trim()||'',source:document.getElementById('fs')?.value||'',stage:document.getElementById('fst')?.value||'Скрининг',status:document.getElementById('fsts')?.value||'В работе',next:document.getElementById('fnx')?.value||'',nextDate:document.getElementById('fnd')?.value||'',comment:document.getElementById('fco')?.value||'',meetTime:document.getElementById('fmt')?.value||'',pdfName:pendingPdfName,refuseReason:document.getElementById('frr')?.value||'',updatedAt:Date.now(),...readTalentPoolFields()});
   D.history.push({date:todayStr(),cid:D.candidates[D.candidates.length-1].id,name,vacancy:vacPicked,event:'Добавлен кандидат',desc:'',result:'',resp:'Я'});
+  if(hrIdVal) syncHrLog(hrIdVal);
   saveData();render();
   // После добавления — сразу открываем карточку редактирования
   const newId = D.candidates[D.candidates.length-1].id;
@@ -1292,6 +1293,34 @@ ${(()=>{
 // статус/причину отказа прямо там — без создания второй карточки. Возвращает
 // id обновлённого кандидата или null, если подходящего не нашлось (тогда
 // вызывающий код должен создать новую запись как обычно).
+// История из HR-ассистента (анализ ИИ, комментарии рекрутера, пересмотры, ответы
+// кандидата) попадает в «История кандидата» этой карточки. Журнал читаем из
+// localStorage ассистента. Повторы определяем по (карточка, событие, текст),
+// поэтому функцию можно вызывать сколько угодно раз.
+function syncHrLog(hrId) {
+  if (!hrId) return 0;
+  const c = D.candidates.find(x => x.hrId === hrId);
+  if (!c) return 0;
+  let log = [];
+  try {
+    const st = JSON.parse(localStorage.getItem('hr_eps_v2') || '{}');
+    const hc = (st.candidates || []).find(x => x.id === hrId);
+    if (hc && hc.fbLog) log = JSON.parse(hc.fbLog);
+  } catch (e) { return 0; }
+  let added = 0;
+  log.forEach(e => {
+    if (!e || !e.event) return;
+    const desc = String(e.desc || '');
+    if (D.history.some(h => h.cid === c.id && h.event === e.event && (h.desc || '') === desc)) return;
+    const d = new Date(e.ts || Date.now());
+    const date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    D.history.unshift({ date, cid: c.id, name: c.name, vacancy: c.vacancy || '', event: e.event, desc, result: '', resp: e.who === 'ИИ' ? 'ИИ' : (e.who === 'Кандидат' ? 'Кандидат' : 'Я') });
+    added++;
+  });
+  if (added) saveData();
+  return added;
+}
+
 function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason, refuseComment }) {
   const phoneDigits = (phone || '').replace(/\D/g, '');
   const nameNorm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -1313,6 +1342,7 @@ function updateStatusByMatch({ hrId, name, phone, vacancy, status, refuseReason,
   c.updatedAt = Date.now();
   D.history.unshift({ date: todayStr(), cid: c.id, name: c.name, vacancy: c.vacancy || '', event: status, desc: 'Отказ проставлен из HR-ассистента', result: '', resp: 'Я' });
   saveData();
+  syncHrLog(c.hrId);
   return c.id;
 }
 
@@ -1552,6 +1582,7 @@ return {
   archiveCandidate,
   openEditByHrId,
   updateStatusByMatch,
+  syncHrLog,
   arrow,
   autoFillNextStep,
   bookSlot,
