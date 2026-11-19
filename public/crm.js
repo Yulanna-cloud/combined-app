@@ -420,7 +420,20 @@ function loadLocal(){
   try{const s=localStorage.getItem('crm_history');if(s){const p=JSON.parse(s);if(Array.isArray(p))D.history=p;}}catch(e){D.history=[];}
   migrateDataV2();
 }
-function saveLocal(){localStorage.setItem('crm_candidates',JSON.stringify(D.candidates));localStorage.setItem('crm_history',JSON.stringify(D.history));}
+// Запись в localStorage. Если память браузера заполнена — раньше здесь вылетала
+// ошибка, и окно карточки не закрывалось по «Сохранить». Теперь просим
+// ассистент сжать свои старые данные (он хранит анализы в том же localStorage),
+// пробуем снова, а если места всё равно нет — предупреждаем, но не падаем:
+// данные при этом всё равно уходят в Google Sheets.
+function saveLocal(){
+  const write=()=>{localStorage.setItem('crm_candidates',JSON.stringify(D.candidates));localStorage.setItem('crm_history',JSON.stringify(D.history));};
+  try{write();return;}catch(e){}
+  for(const level of [1,2]){
+    try{if(typeof HR!=='undefined'&&HR.compactStorage)HR.compactStorage(level);}catch(e){}
+    try{write();return;}catch(e){}
+  }
+  if(!window._crmQuotaWarned){window._crmQuotaWarned=true;alert('Память браузера заполнена, поэтому CRM не может сохранить копию у вас в браузере. Изменения уходят в Google Sheets. Напиши мне — освободим место.');}
+}
 function saveData(){saveLocal();syncToSheets();}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseDate(s){if(!s)return null;const p=s.split('-');if(p.length!==3)return null;return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));}
