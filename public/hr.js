@@ -236,7 +236,51 @@ let state = {
   prompts: { ...DEFAULT_PROMPTS }
 };
 
-function save() { try { localStorage.setItem('hr_eps_v2', JSON.stringify(state)); } catch(e) {} }
+// ── Память браузера ───────────────────────────────────────────────
+// localStorage — примерно 5 МБ на сайт, общие для ассистента и CRM. Когда они
+// заполняются, запись молча не проходила (в ассистенте) или падала с ошибкой
+// (в CRM — окно карточки не закрывалось по «Сохранить»). Теперь при нехватке
+// места сжимаем то, что можно восстановить, и пробуем ещё раз.
+const LS_QUOTA_CHARS = 5200000;
+let _quotaWarned = false;
+function storageUsage() {
+  let n = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) {}
+  return n;
+}
+// Выбрасываем готовый HTML анализа: он пересоздаётся из текста анализа
+// (rawAnalysis) при открытии карточки. Уровень 1 — только архивные кандидаты,
+// уровень 2 — все, кроме открытого сейчас. Текст резюме, сами анализы,
+// вопросы, интервью и история не трогаем.
+function compactStorage(level) {
+  let freed = 0;
+  state.candidates.forEach(c => {
+    if (c.id === state.currentCandidateId) return;
+    if ((level || 1) < 2 && !c.archived) return;
+    if (c.resumeHTML && c.rawAnalysis) { freed += c.resumeHTML.length; c.resumeHTML = ''; }
+    if (c.chatAnswersHTML && c.rawAnalysisChatAnswers) { freed += c.chatAnswersHTML.length; c.chatAnswersHTML = ''; }
+  });
+  return freed;
+}
+function compactAndPersist(level) {
+  const freed = compactStorage(level);
+  try { localStorage.setItem('hr_eps_v2', JSON.stringify(state)); } catch (e) {}
+  return freed;
+}
+function warnQuota() {
+  if (_quotaWarned) return;
+  _quotaWarned = true;
+  alert('Память браузера заполнена, и новые изменения не помещаются. Данные при этом уходят в Google Sheets (кнопка «Сохранить» вверху). Напиши мне — освободим место.');
+}
+function save() {
+  const write = () => localStorage.setItem('hr_eps_v2', JSON.stringify(state));
+  try { write(); return; } catch (e) {}
+  for (const level of [1, 2]) {
+    compactStorage(level);
+    try { write(); return; } catch (e) {}
+  }
+  warnQuota();
+}
 function load() {
   try {
     const s = localStorage.getItem('hr_eps_v2');
@@ -1175,9 +1219,11 @@ function openCandidate(id) {
   document.getElementById('q-focus').value = c.qFocus || '';
   document.getElementById('questions-content').innerHTML = c.questionsHTML || '';
   document.getElementById('ca-answers').value = c.chatAnswers || '';
+  if (!c.chatAnswersHTML && c.rawAnalysisChatAnswers) c.chatAnswersHTML = resultBox('Вердикт по ответам в чате · ' + c.name, c.rawAnalysisChatAnswers);
   document.getElementById('chatanswers-content').innerHTML = c.chatAnswersHTML || '';
   document.getElementById('i-transcript').value = c.transcript || '';
   document.getElementById('interview-content').innerHTML = c.interviewHTML || '';
+  if (!c.resumeHTML && c.rawAnalysis) c.resumeHTML = resultBox('Анализ резюме · ' + c.name, c.rawAnalysis) + (isAnonName(c.name) ? '' : crmExportBox(c.id));
   document.getElementById('resume-content').innerHTML = c.resumeHTML || `
 <div class="empty" style="margin-bottom:16px;"><i class="ti ti-file-text"></i><p>Анализ резюме ещё не проводился</p></div>
 <button class="btn btn-primary btn-full" style="margin-bottom:14px;" onclick="HR.reAnalyzeCandidate()">
@@ -2406,6 +2452,12 @@ load();
   save();
 })();
 
+// Если память браузера заполнена больше чем на 85% — заранее сжимаем архивные анализы
+(function checkStorageOnStart() {
+  if (storageUsage() > LS_QUOTA_CHARS * 0.85) compactAndPersist(1);
+  if (storageUsage() > LS_QUOTA_CHARS * 0.92) setTimeout(() => toast('⚠️ Память браузера почти заполнена — напиши мне, освободим место'), 2000);
+})();
+
 // ── Интеграция с расширением HH — через localStorage ────────────
 
 function applyIncomingResume(payload) {
@@ -2562,6 +2614,8 @@ return {
 
   findCandidateHistory,
   saveAnonContacts,
+  compactStorage: compactAndPersist,
+  storageUsage,
   submitFeedback,
   setLeadsFilter,
   openLeadCandidate,
