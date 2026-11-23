@@ -257,8 +257,9 @@ function compactStorage(level) {
   state.candidates.forEach(c => {
     if (c.id === state.currentCandidateId) return;
     if ((level || 1) < 2 && !c.archived) return;
-    if (c.resumeHTML && c.rawAnalysis) { freed += c.resumeHTML.length; c.resumeHTML = ''; }
-    if (c.chatAnswersHTML && c.rawAnalysisChatAnswers) { freed += c.chatAnswersHTML.length; c.chatAnswersHTML = ''; }
+    [['resumeHTML', 'rawAnalysis'], ['questionsHTML', 'rawAnalysisQuestions'], ['interviewHTML', 'rawAnalysisInterview'], ['chatAnswersHTML', 'rawAnalysisChatAnswers']].forEach(([html, raw]) => {
+      if (c[html] && c[raw]) { freed += c[html].length; c[html] = ''; }
+    });
   });
   return freed;
 }
@@ -267,10 +268,50 @@ function compactAndPersist(level) {
   try { localStorage.setItem('hr_eps_v2', JSON.stringify(state)); } catch (e) {}
   return freed;
 }
+function memoryBreakdown() {
+  const lenOf = v => (v == null ? 0 : (typeof v === 'string' ? v.length : JSON.stringify(v).length));
+  const groups = [
+    ['Тексты резюме', ['resume']],
+    ['Анализы ИИ', ['rawAnalysis', 'rawAnalysisQuestions', 'rawAnalysisInterview', 'rawAnalysisChatAnswers']],
+    ['Готовая разметка анализов (восстанавливается сама)', ['resumeHTML', 'questionsHTML', 'interviewHTML', 'chatAnswersHTML']],
+    ['Расшифровки интервью', ['transcript']],
+    ['Ответы кандидатов в чате', ['chatAnswers']],
+    ['Журнал истории', ['fbLog']]
+  ];
+  const sums = {}; let other = 0;
+  state.candidates.forEach(c => Object.keys(c).forEach(k => {
+    const n = lenOf(c[k]); const g = groups.find(x => x[1].includes(k));
+    if (g) sums[g[0]] = (sums[g[0]] || 0) + n; else other += n;
+  }));
+  sums['Прочие данные кандидатов'] = other;
+  const keys = {};
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); keys[k] = k.length + (localStorage.getItem(k) || '').length; } } catch (e) {}
+  return { sums, keys };
+}
+function renderMemoryInfo() {
+  const el = document.getElementById('mem-info');
+  if (!el) return;
+  const pct = storagePercent(), used = storageUsage();
+  const kb = n => Math.round(n / 1000).toLocaleString('ru-RU') + ' тыс.';
+  const { sums, keys } = memoryBreakdown();
+  const color = pct >= 90 ? '#c62828' : pct >= 75 ? '#f9a825' : '#2e7d32';
+  const keyNames = { hr_eps_v2: 'Ассистент (кандидаты, вакансии, промты)', crm_candidates: 'CRM — кандидаты', crm_history: 'CRM — история событий' };
+  const rows = o => Object.entries(o).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<tr><td style="padding:2px 12px 2px 0;">${escHtml(keyNames[k] || k)}</td><td style="text-align:right;">${kb(n)} знаков</td></tr>`).join('');
+  el.innerHTML = `<div style="font-size:13px;margin-bottom:6px;"><b>${pct}%</b> заполнено (${kb(used)} из ~${kb(LS_QUOTA_CHARS)} знаков)</div>
+<div style="height:10px;background:#e0e0e0;border-radius:6px;overflow:hidden;margin-bottom:10px;"><div style="width:${Math.min(pct, 100)}%;height:100%;background:${color};"></div></div>
+<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Что где лежит</div><table style="font-size:12px;border-collapse:collapse;margin-bottom:8px;">${rows(keys)}</table>
+<div style="font-size:12px;font-weight:700;margin-bottom:2px;">Внутри ассистента (${state.candidates.length} кандидатов, из них в архиве ${state.candidates.filter(c => c.archived).length})</div><table style="font-size:12px;border-collapse:collapse;">${rows(sums)}</table>`;
+}
+function memoryCleanup() {
+  const changed = dedupeLogTexts();
+  const freed = compactAndPersist(2) + (changed ? 1 : 0);
+  renderMemoryInfo(); showStorageBanner();
+  toast('Готово, освобождено примерно ' + Math.round(freed / 1000) + ' тыс. знаков');
+}
 function warnQuota() {
   if (_quotaWarned) return;
   _quotaWarned = true;
-  alert('Память браузера заполнена, и новые изменения не помещаются. Данные при этом уходят в Google Sheets (кнопка «Сохранить» вверху). Напиши мне — освободим место.');
+  alert('Память браузера заполнена, и новые изменения не помещаются локально. Данные при этом уходят в Google Sheets. Открой Настройки → «Память браузера» — там видно, что занимает место, и есть кнопка очистки.');
 }
 function save() {
   const write = () => localStorage.setItem('hr_eps_v2', JSON.stringify(state));
@@ -539,14 +580,29 @@ function logEvent(c, event, desc, who, text) {
   c.fbLog = JSON.stringify(log);
 }
 // Анализы, сделанные до появления журнала, тоже сохраняем как первую запись
+// Полный текст анализа в журнале хранится ТОЛЬКО у старых (замещённых) версий:
+// текущий лежит в rawAnalysis, дублировать его — лишняя трата памяти браузера.
+// Поэтому перед заменой анализа прикрепляем его текст к своей записи в журнале.
 function ensureBaselineLogged(c) {
   if (!c.rawAnalysis) return;
   const log = getLog(c);
   const sum = analysisSummary(c.rawAnalysis);
-  if (log.some(e => e.text === c.rawAnalysis || (/^Анализ/.test(e.event) && e.desc === sum))) return;
-  log.push({ ts: c.updatedAt || Date.now(), event: 'Анализ резюме (ИИ)', desc: sum, who: 'ИИ', text: c.rawAnalysis });
+  const e = sum ? [...log].reverse().find(x => /^(Анализ резюме|Пересмотр анализа)/.test(x.event) && (x.desc || '').startsWith(sum)) : null;
+  if (e) { if (!e.text) e.text = c.rawAnalysis; }
+  else log.push({ ts: c.updatedAt || Date.now(), event: 'Анализ резюме (ИИ)', desc: sum, who: 'ИИ', text: c.rawAnalysis });
   log.sort((a, b) => a.ts - b.ts);
   c.fbLog = JSON.stringify(log);
+}
+// Убираем из журналов ненужные копии текстов (остались от прежней версии)
+function dedupeLogTexts() {
+  let changed = false;
+  state.candidates.forEach(c => {
+    if (!c.fbLog) return;
+    const log = getLog(c); let ch = false;
+    log.forEach(e => { if (e.text && (e.text === c.rawAnalysis || e.text === c.rawAnalysisChatAnswers)) { delete e.text; ch = true; } });
+    if (ch) { c.fbLog = JSON.stringify(log); changed = true; }
+  });
+  return changed;
 }
 function recruiterComments(c) { return getLog(c).filter(e => e.event === 'Комментарий рекрутера').map(e => e.desc); }
 // Журнал → история кандидата в CRM (если карточка там уже есть; иначе CRM заберёт его при создании карточки)
@@ -556,7 +612,7 @@ function syncLogToCrm(c) {
 }
 function logAnalysisEvent(c, text, event) {
   if (!c) return;
-  logEvent(c, event || 'Анализ резюме (ИИ)', analysisSummary(text), 'ИИ', text);
+  logEvent(c, event || 'Анализ резюме (ИИ)', analysisSummary(text), 'ИИ');
   syncLogToCrm(c);
 }
 
@@ -615,7 +671,7 @@ function submitFeedback() {
       ensureBaselineLogged(c); // прежняя версия анализа сохраняется в историю до замены
       const changed = changedSummary(text);
       logEvent(c, 'Комментарий рекрутера', comment, 'Я');
-      logEvent(c, 'Пересмотр анализа (ИИ)', analysisSummary(text) + (changed ? ' · Что изменилось: ' + changed : ''), 'ИИ', text);
+      logEvent(c, 'Пересмотр анализа (ИИ)', analysisSummary(text) + (changed ? ' · Что изменилось: ' + changed : ''), 'ИИ');
       c.rawAnalysis = text;
       c.verdict = verdictFromText(text) || c.verdict;
       c.updatedAt = Date.now();
@@ -1109,6 +1165,7 @@ function showPanel(name) {
   } else if (name === 'settings') {
     document.getElementById('panel-settings').classList.add('active');
     document.getElementById('nav-settings').classList.add('active');
+    renderMemoryInfo();
   } else if (name === 'companies') {
     document.getElementById('panel-companies').classList.add('active');
     document.getElementById('nav-companies').classList.add('active');
@@ -1216,10 +1273,12 @@ function openCandidate(id) {
   const c = currentCandidate();
   showPanel('candidate');
   switchTab('resume');
+  if (!c.questionsHTML && c.rawAnalysisQuestions) c.questionsHTML = resultBox('Вопросы для интервью · ' + c.name, c.rawAnalysisQuestions);
+  if (!c.interviewHTML && c.rawAnalysisInterview) c.interviewHTML = resultBox('Разбор интервью · ' + c.name, c.rawAnalysisInterview);
+  if (!c.chatAnswersHTML && c.rawAnalysisChatAnswers) c.chatAnswersHTML = resultBox('Вердикт по ответам в чате · ' + c.name, c.rawAnalysisChatAnswers);
   document.getElementById('q-focus').value = c.qFocus || '';
   document.getElementById('questions-content').innerHTML = c.questionsHTML || '';
   document.getElementById('ca-answers').value = c.chatAnswers || '';
-  if (!c.chatAnswersHTML && c.rawAnalysisChatAnswers) c.chatAnswersHTML = resultBox('Вердикт по ответам в чате · ' + c.name, c.rawAnalysisChatAnswers);
   document.getElementById('chatanswers-content').innerHTML = c.chatAnswersHTML || '';
   document.getElementById('i-transcript').value = c.transcript || '';
   document.getElementById('interview-content').innerHTML = c.interviewHTML || '';
@@ -2014,7 +2073,7 @@ function analyzeChatAnswers() {
       const verdictLine = ((text.match(/ВЕРДИКТ[:\s]*([^\n]*)/i) || [])[1] || '').trim();
       const recalcLine = recalc ? recalc[0].replace(/ПЕРЕСЧЁТ ПО ОТВЕТАМ\s*/i, '').trim().replace(/\s*\n\s*/g, ' · ') : '';
       logEvent(c, 'Ответы кандидата в чате', answers, 'Кандидат');
-      logEvent(c, 'Оценка по ответам кандидата (ИИ)', [verdictLine, recalcLine].filter(Boolean).join(' · ').slice(0, 700), 'ИИ', text);
+      logEvent(c, 'Оценка по ответам кандидата (ИИ)', [verdictLine, recalcLine].filter(Boolean).join(' · ').slice(0, 700), 'ИИ');
       save(); renderCandidates();
       el.innerHTML = c.chatAnswersHTML;
       syncToSheets(); syncLogToCrm(c);
@@ -2452,10 +2511,27 @@ load();
   save();
 })();
 
-// Если память браузера заполнена больше чем на 85% — заранее сжимаем архивные анализы
+// Память браузера: при открытии убираем дубли и восстановимую разметку, а если
+// места всё равно мало — показываем постоянное предупреждение (не исчезающее).
+function storagePercent() { return Math.round(storageUsage() / LS_QUOTA_CHARS * 100); }
+function showStorageBanner() {
+  const b = document.getElementById('storage-banner');
+  if (!b) return;
+  const pct = storagePercent();
+  if (pct < 90) { b.style.display = 'none'; return; }
+  b.style.display = 'flex';
+  b.querySelector('.sb-text').textContent = '⚠️ Память браузера заполнена на ' + pct + '%. Скоро перестанет сохраняться.';
+}
+function openMemorySettings() {
+  showPanel('settings');
+  setTimeout(() => { const el = document.getElementById('mem-info'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+}
 (function checkStorageOnStart() {
-  if (storageUsage() > LS_QUOTA_CHARS * 0.85) compactAndPersist(1);
-  if (storageUsage() > LS_QUOTA_CHARS * 0.92) setTimeout(() => toast('⚠️ Память браузера почти заполнена — напиши мне, освободим место'), 2000);
+  const changed = dedupeLogTexts();
+  if (changed) save();
+  if (storagePercent() > 80) compactAndPersist(1);
+  if (storagePercent() > 80) compactAndPersist(2);
+  showStorageBanner();
 })();
 
 // ── Интеграция с расширением HH — через localStorage ────────────
@@ -2615,6 +2691,9 @@ return {
   findCandidateHistory,
   saveAnonContacts,
   compactStorage: compactAndPersist,
+  memoryCleanup,
+  renderMemoryInfo,
+  openMemorySettings,
   storageUsage,
   submitFeedback,
   setLeadsFilter,
