@@ -28,6 +28,11 @@
 </div>
 
 <div id="view-hr" class="view active">
+<div id="storage-banner" style="display:none;position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9999;align-items:center;gap:10px;background:#fff3e0;border:2px solid #f57c00;color:#7a4a00;padding:8px 14px;border-radius:8px;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+  <span class="sb-text"></span>
+  <button class="btn btn-primary" onclick="HR.openMemorySettings()" style="padding:4px 10px;">Освободить место</button>
+  <button class="btn" onclick="document.getElementById('storage-banner').style.display='none'" style="padding:4px 8px;">×</button>
+</div>
 <div class="app">
   <div class="sidebar">
     <div class="sidebar-logo">
@@ -355,6 +360,11 @@
           <p class="field-hint">Свободные заметки о реальных решениях по кандидатам, которые разошлись с оценкой ИИ (или просто важные паттерны). Автоматически подмешиваются в анализ резюме — при следующих оценках ИИ будет их учитывать.</p>
         </div>
         <button class="btn btn-primary" onclick="HR.saveSettings()"><i class="ti ti-check"></i> Сохранить</button>
+        <hr class="divider">
+        <div class="section-title">Память браузера</div>
+        <p class="field-hint" style="margin-bottom:8px;">Ассистент и CRM хранят данные в памяти браузера (примерно 5 МБ на сайт). Если она заполнится, новые изменения перестанут сохраняться локально. Копия данных при этом всегда уходит в Google Sheets.</p>
+        <div id="mem-info" style="margin-bottom:10px;"></div>
+        <button class="btn btn-primary" onclick="HR.memoryCleanup()"><i class="ti ti-broom"></i> Освободить место (данные не теряются)</button>
         <hr class="divider">
         <div class="section-title">Как получить API ключ</div>
         <div class="info-box info-blue" style="flex-direction:column;gap:6px;">
