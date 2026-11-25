@@ -342,12 +342,36 @@
         </div>
         <div class="field">
           <label>Модель</label>
-          <select id="model-select">
+          <select id="model-select" onchange="HR.onModelSelect('model-select')">
             <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 — быстрая и дешёвая (~$0.001/резюме)</option>
             <option value="claude-sonnet-4-6" selected>claude-sonnet-4-6 — оптимальная (~$0.01/резюме) ✓ рекомендуется</option>
             <option value="claude-opus-4-6">claude-opus-4-6 — максимальное качество (~$0.05/резюме)</option>
+            <optgroup label="Новое поколение (проверь, есть ли у шлюза — кнопка ниже)">
+              <option value="claude-sonnet-5-5">claude-sonnet-5-5</option>
+              <option value="claude-opus-5-5">claude-opus-5-5</option>
+            </optgroup>
+            <option value="__custom__">Другая модель (ввести название)…</option>
           </select>
-          <p class="field-hint">Для анализа резюме Sonnet — оптимальный выбор.</p>
+          <p class="field-hint">Для массового анализа резюме Sonnet — оптимальный выбор: быстрый и недорогой.</p>
+        </div>
+        <div class="field">
+          <label>Модель для пересмотра</label>
+          <select id="review-model-select" onchange="HR.onModelSelect('review-model-select')">
+            <option value="" selected>Та же, что основная</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 — быстрая и дешёвая (~$0.001/резюме)</option>
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6 — оптимальная (~$0.01/резюме) ✓ рекомендуется</option>
+            <option value="claude-opus-4-6">claude-opus-4-6 — максимальное качество (~$0.05/резюме)</option>
+            <optgroup label="Новое поколение (проверь, есть ли у шлюза — кнопка ниже)">
+              <option value="claude-sonnet-5-5">claude-sonnet-5-5</option>
+              <option value="claude-opus-5-5">claude-opus-5-5</option>
+            </optgroup>
+            <option value="__custom__">Другая модель (ввести название)…</option>
+          </select>
+          <p class="field-hint">Работает для кнопки «Пересмотреть» (комментарий рекрутера) и для пересчёта оценки по ответам кандидата в чате. Для спорных случаев можно выбрать более сильную модель, а рутину оставить на основной.</p>
+        </div>
+        <div class="field">
+          <button class="btn" onclick="HR.loadGatewayModels()"><i class="ti ti-list-search"></i> Показать модели, доступные у шлюза</button>
+          <div id="gateway-models" class="field-hint" style="margin-top:6px;"></div>
         </div>
         <div class="field">
           <label>Ссылка на вашу CRM</label>
