@@ -409,7 +409,10 @@ function effectiveSite(v) {
 
 function applyLoaded() {
   if (state.apiKey) document.getElementById('api-key').value = state.apiKey;
+  ensureModelOption('model-select', state.model);
+  ensureModelOption('review-model-select', state.reviewModel);
   if (state.model) document.getElementById('model-select').value = state.model;
+  document.getElementById('review-model-select').value = state.reviewModel || '';
   if (state.crmUrl) document.getElementById('crm-url').value = state.crmUrl;
   if (state.calibrationNotes) document.getElementById('calibration-notes').value = state.calibrationNotes;
   document.getElementById('prompt-resume').value = state.prompts.resume;
@@ -635,7 +638,7 @@ function renderFeedbackBlock(c) {
     <button class="btn btn-primary" onclick="HR.submitFeedback()"><i class="ti ti-refresh"></i> Пересмотреть</button>
     <button class="btn" onclick="HR.switchTab('chatanswers')"><i class="ti ti-message"></i> Ввести ответы кандидата</button>
   </div>
-  <p class="field-hint" style="margin-top:6px;">ИИ учтёт комментарий как новую вводную от рекрутера и сам решит, менять ли вердикт. Вопросы для чата HH и для звонка он выдаст в любом случае.</p>
+  <p class="field-hint" style="margin-top:6px;">ИИ учтёт комментарий как новую вводную от рекрутера и сам решит, менять ли вердикт. Вопросы для чата HH и для звонка он выдаст в любом случае. Модель для пересмотра: <b>${escHtml(state.reviewModel || state.model || 'claude-sonnet-4-6')}</b> (меняется в Настройках).</p>
   <div id="feedback-status"></div>
   ${items ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;">История по кандидату (${log.length})</summary>${items}</details>` : ''}
 </div>`;
@@ -665,6 +668,7 @@ function submitFeedback() {
     system: buildPrompt('feedback'),
     user,
     loadingEl: el,
+    model: state.reviewModel || undefined,
     maxTokens: 2200,
     timeoutMs: 120000,
     onSuccess: (text) => {
@@ -1539,9 +1543,52 @@ function copyText(text) {
 function updateCopyBtn(tab) { /* no-op, copy buttons are inline */ }
 
 // ── Settings ──────────────────────────────────────────────────────
+// ── Выбор модели ИИ ─────────────────────────────────────────────
+// Добавляет модель в выпадающий список, если её там ещё нет (например, название
+// из списка шлюза или введённое вручную).
+function ensureModelOption(selId, value) {
+  const sel = document.getElementById(selId);
+  if (!sel || !value) return;
+  if ([...sel.options].some(o => o.value === value)) return;
+  const o = document.createElement('option');
+  o.value = value; o.textContent = value;
+  const other = sel.querySelector('option[value="__custom__"]');
+  sel.insertBefore(o, other || null);
+}
+function onModelSelect(selId) {
+  const sel = document.getElementById(selId);
+  if (!sel || sel.value !== '__custom__') return;
+  const v = (prompt('Введи название модели точно так, как оно указано у шлюза (например, claude-sonnet-5-5):', '') || '').trim();
+  if (!v) { sel.value = selId === 'review-model-select' ? '' : (state.model || 'claude-sonnet-4-6'); return; }
+  ensureModelOption(selId, v);
+  sel.value = v;
+}
+// Спрашиваем у самого шлюза, какие модели Claude доступны по этому ключу
+async function loadGatewayModels() {
+  const out = document.getElementById('gateway-models');
+  const key = (document.getElementById('api-key').value || state.apiKey || '').trim();
+  if (!key) { out.textContent = 'Сначала впиши API ключ выше.'; return; }
+  out.textContent = '⏳ Запрашиваю список у шлюза…';
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+    const resp = await fetch('https://apinet.cloud/v1/models', { headers: { 'Authorization': 'Bearer ' + key }, signal: ctrl.signal });
+    clearTimeout(t);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    const ids = (data.data || data.models || []).map(m => (typeof m === 'string' ? m : (m.id || m.name || ''))).filter(Boolean);
+    const claude = ids.filter(id => /claude/i.test(id)).sort();
+    if (!claude.length) { out.textContent = 'Шлюз ответил, но моделей Claude в списке нет (всего моделей: ' + ids.length + '). Можно выбрать «Другая…» и ввести название вручную.'; return; }
+    claude.forEach(id => { ensureModelOption('model-select', id); ensureModelOption('review-model-select', id); });
+    out.innerHTML = '✅ Доступно у шлюза (' + claude.length + '): ' + claude.map(id => '<code>' + escHtml(id) + '</code>').join(', ') + '<br>Они добавлены в оба списка выше — выбери и нажми «Сохранить».';
+  } catch (e) {
+    out.textContent = 'Не удалось получить список (' + (e.name === 'AbortError' ? 'шлюз не ответил' : e.message) + '). Можно выбрать «Другая…» и ввести название модели вручную.';
+  }
+}
+
 function saveSettings() {
   state.apiKey = document.getElementById('api-key').value.trim();
   state.model = document.getElementById('model-select').value;
+  state.reviewModel = document.getElementById('review-model-select').value;
   state.crmUrl = document.getElementById('crm-url').value.trim();
   state.calibrationNotes = document.getElementById('calibration-notes').value;
   save(); toast('Настройки сохранены');
@@ -1549,8 +1596,8 @@ function saveSettings() {
 
 function clearAllData() {
   if (!confirm('Удалить все вакансии, кандидатов и данные? API ключ сохранится.')) return;
-  const key = state.apiKey; const model = state.model; const crmUrl = state.crmUrl;
-  state = { apiKey: key, model, crmUrl, vacancies: [], currentVacancyId: null, candidates: [], currentCandidateId: null, prompts: { ...DEFAULT_PROMPTS } };
+  const key = state.apiKey; const model = state.model; const reviewModel = state.reviewModel; const crmUrl = state.crmUrl;
+  state = { apiKey: key, model, reviewModel, crmUrl, vacancies: [], currentVacancyId: null, candidates: [], currentCandidateId: null, prompts: { ...DEFAULT_PROMPTS } };
   save(); applyLoaded(); toast('Данные удалены');
 }
 
@@ -1615,7 +1662,7 @@ function buildPrompt(type) {
 
 // ── API ───────────────────────────────────────────────────────────
 let _apiBusy = false;
-async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens, timeoutMs }) {
+async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens, timeoutMs, model }) {
   if (!state.apiKey) { onError('Сначала укажи API ключ в разделе «Настройки»'); return; }
   // Защита от повторного нажатия: пока запрос идёт, второй клик не запускает
   // ещё один анализ (иначе — лишний расход токенов и путаница).
@@ -1636,7 +1683,7 @@ async function callAPI({ system, user, loadingEl, onSuccess, onError, maxTokens,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.apiKey}` },
         signal: controller.signal,
         body: JSON.stringify({
-          model: state.model || 'claude-sonnet-4-6',
+          model: model || state.model || 'claude-sonnet-4-6',
           max_tokens: maxTokens || 4000,
           messages: [
             { role: 'system', content: system },
@@ -2073,6 +2120,7 @@ function analyzeChatAnswers() {
   const comments = recruiterComments(c);
   callAPI({
     system: buildPrompt('chatAnswers'),
+    model: state.reviewModel || undefined,
     user: `АНАЛИЗ РЕЗЮМЕ (текущая версия, включая вопросы, заданные кандидату):\n${c.rawAnalysis}` +
       (comments.length ? `\n\nКОММЕНТАРИИ РЕКРУТЕРА (новая вводная, а не приказ):\n- ${comments.join('\n- ')}` : '') +
       `\n\nОТВЕТЫ КАНДИДАТА В ЧАТЕ HH:\n${answers}`,
@@ -2430,7 +2478,7 @@ function syncToSheets() {
   syncStatus('⏳ Сохраняю...', 'loading');
   fetch(SHEETS_URL, {
     method: 'POST',
-    body: JSON.stringify({ action:'save', candidates:encodeForSheets(state.candidates), companies:state.companies, vacancies:state.vacancies, prompts:state.prompts, model:state.model, crmUrl:state.crmUrl })
+    body: JSON.stringify({ action:'save', candidates:encodeForSheets(state.candidates), companies:state.companies, vacancies:state.vacancies, prompts:state.prompts, model:state.model, reviewModel:state.reviewModel, crmUrl:state.crmUrl })
   })
   .then(r => r.json())
   .then(res => { if (res && res.ok) syncStatus('✅ Сохранено', 'ok'); else syncStatus('❌ Ошибка', 'err'); })
@@ -2479,7 +2527,7 @@ function loadFromSheets() {
       if (d.companies && d.companies.length) state.companies = mergeById(d.companies, state.companies);
       if (d.vacancies && d.vacancies.length) state.vacancies = mergeById(d.vacancies, state.vacancies);
       if (d.prompts && Object.keys(d.prompts).length) state.prompts = { ...state.prompts, ...d.prompts };
-      if (d.settings) { if (d.settings.model) state.model = d.settings.model; if (d.settings.crmUrl) state.crmUrl = d.settings.crmUrl; }
+      if (d.settings) { if (d.settings.model) state.model = d.settings.model; if (d.settings.reviewModel !== undefined && d.settings.reviewModel !== '') state.reviewModel = d.settings.reviewModel; if (d.settings.crmUrl) state.crmUrl = d.settings.crmUrl; }
       save();
       applyLoaded();
       // Показываем всех кандидатов — выбираем первую вакансию если не выбрана
@@ -2705,6 +2753,8 @@ return {
   findCandidateHistory,
   saveAnonContacts,
   compactStorage: compactAndPersist,
+  onModelSelect,
+  loadGatewayModels,
   memoryCleanup,
   renderMemoryInfo,
   openMemorySettings,
